@@ -402,7 +402,27 @@ final class GrocyAPIClient {
         let result: CreatedObjectResponse = try await post("/objects/recipes", body: Body(name: name, description: description, baseServings: baseServings))
         return result.createdObjectId
     }
-    
+
+    func createRecipePosition(recipeId: Int, productId: Int, amount: Double, quantityUnitId: Int?, note: String?) async throws {
+        struct Body: Encodable {
+            let recipeId: Int
+            let productId: Int
+            let amount: Double
+            let quantityUnitId: Int?
+            let note: String?
+        }
+        let result: CreatedObjectResponse = try await post(
+            "/objects/recipe_positions",
+            body: Body(recipeId: recipeId, productId: productId, amount: amount, quantityUnitId: quantityUnitId, note: note)
+        )
+        _ = result
+    }
+
+    func deleteRecipePosition(id: Int) async throws {
+        let req = try request("/objects/recipe_positions/\(id)", method: "DELETE")
+        try await performVoid(req)
+    }
+
     // MARK: - Meal Plan
     
     func getMealPlan() async throws -> [MealPlanItem] {
@@ -413,7 +433,12 @@ final class GrocyAPIClient {
         struct Body: Encodable { let day: String; let recipeId: Int; let recipeServings: Double }
         return try await post("/objects/meal_plan", body: Body(day: day, recipeId: recipeId, recipeServings: servings))
     }
-    
+
+    func addMealPlanNote(day: String, note: String) async throws {
+        struct Body: Encodable { let day: String; let note: String }
+        let _: CreatedObjectResponse = try await post("/objects/meal_plan", body: Body(day: day, note: note))
+    }
+
     func deleteMealPlanItem(id: Int) async throws {
         let req = try request("/objects/meal_plan/\(id)", method: "DELETE")
         try await performVoid(req)

@@ -55,10 +55,18 @@ struct RecipesView: View {
                 }
             }
             .sheet(isPresented: $showAddMealPlan) {
-                AddMealPlanSheet(day: addMealPlanDay, recipes: vm.recipes) { recipeId, servings in
-                    guard let client = appVM.client else { return }
-                    await vm.addToMealPlan(client: client, day: addMealPlanDay, recipeId: recipeId, servings: servings)
-                }
+                AddMealPlanSheet(
+                    day: addMealPlanDay,
+                    recipes: vm.recipes,
+                    onSaveRecipe: { recipeId, servings in
+                        guard let client = appVM.client else { return }
+                        await vm.addToMealPlan(client: client, day: addMealPlanDay, recipeId: recipeId, servings: servings)
+                    },
+                    onSaveProduct: { productName, amount, unitName in
+                        guard let client = appVM.client else { return }
+                        await vm.addProductToMealPlan(client: client, day: addMealPlanDay, productName: productName, amount: amount, unitName: unitName)
+                    }
+                )
             }
         }
         .task {
@@ -282,9 +290,11 @@ struct MealPlanDayCard: View {
                 .italic()
         } else {
             ForEach(items) { item in
-                if let recipe = recipes.first(where: { $0.id == item.recipeId }) {
-                    MealPlanItemRow(recipe: recipe, item: item, onRemove: onRemove)
-                }
+                MealPlanItemRow(
+                    recipe: recipes.first(where: { $0.id == item.recipeId }),
+                    item: item,
+                    onRemove: onRemove
+                )
             }
         }
     }
@@ -292,20 +302,27 @@ struct MealPlanDayCard: View {
 
 // MARK: - MealPlanItemRow
 struct MealPlanItemRow: View {
-    let recipe: Recipe
+    let recipe: Recipe?
     let item: MealPlanItem
     let onRemove: (Int) async -> Void
 
     var body: some View {
         HStack {
-            Image(systemName: "fork.knife.circle.fill")
-                .foregroundStyle(Color.accentColor)
-            Text(recipe.name)
-                .font(.subheadline)
-            if let servings = item.recipeServings {
-                Text(String(format: "×%.0f", servings))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            if let recipe = recipe {
+                Image(systemName: "fork.knife.circle.fill")
+                    .foregroundStyle(Color.accentColor)
+                Text(recipe.name)
+                    .font(.subheadline)
+                if let servings = item.recipeServings {
+                    Text(String(format: "×%.0f", servings))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else if let note = item.note, !note.isEmpty {
+                Image(systemName: "bag.circle.fill")
+                    .foregroundStyle(.green)
+                Text(note)
+                    .font(.subheadline)
             }
             Spacer()
             Button {
@@ -381,12 +398,35 @@ struct CreateRecipeSheet: View {
 struct AddMealPlanSheet: View {
     let day: String
     let recipes: [Recipe]
-    let onSave: (Int, Double) async -> Void
-    @Environment(\.dismiss) private var dismiss
+    let onSaveRecipe: (Int, Double) async -> Void
+    let onSaveProduct: (String, Double, String?) async -> Void
 
+    @Environment(\.dismiss) private var dismiss
+    @Environment(AppViewModel.self) private var appVM
+
+    enum EntryType: String, CaseIterable {
+        case recipe = "Recipe"
+        case product = "Product"
+    }
+
+    @State private var entryType: EntryType = .recipe
     @State private var selectedRecipeId: Int?
     @State private var servings: Double = 1
+    // Product mode
+    @State private var allProducts: [Product] = []
+    @State private var allUnits: [QuantityUnit] = []
+    @State private var selectedProductId: Int?
+    @State private var productAmount: Double = 1
+    @State private var selectedUnitId: Int?
+    @State private var productSearch = ""
     @State private var isSaving = false
+    @State private var isLoadingProducts = false
+
+    private var filteredProducts: [Product] {
+        productSearch.isEmpty ? allProducts : allProducts.filter {
+            $0.name.localizedCaseInsensitiveContains(productSearch)
+        }
+    }
 
     private var displayDate: String {
         guard let date = DateFormatters.shared.apiDate.date(from: day) else { return day }
@@ -403,32 +443,19 @@ struct AddMealPlanSheet: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Section("Recipe") {
-                    if recipes.isEmpty {
-                        Text("No recipes available. Create one in the Recipes tab.")
-                            .foregroundStyle(.secondary)
-                            .font(.subheadline)
-                    } else {
-                        Picker("Select Recipe", selection: $selectedRecipeId) {
-                            Text("Choose…").tag(Int?.none)
-                            ForEach(recipes) { recipe in
-                                Text(recipe.name).tag(Int?.some(recipe.id))
-                            }
+                Section {
+                    Picker("Add", selection: $entryType) {
+                        ForEach(EntryType.allCases, id: \.self) { t in
+                            Text(t.rawValue).tag(t)
                         }
-                        .pickerStyle(.navigationLink)
                     }
+                    .pickerStyle(.segmented)
                 }
 
-                Section("Servings") {
-                    Stepper(value: $servings, in: 0.5...100, step: 0.5) {
-                        HStack {
-                            Text("Servings")
-                            Spacer()
-                            Text(servings.formatted(.number.precision(.fractionLength(0...1))))
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
-                        }
-                    }
+                if entryType == .recipe {
+                    recipeSection
+                } else {
+                    productSection
                 }
             }
             .navigationTitle("Add to Meal Plan")
@@ -442,21 +469,150 @@ struct AddMealPlanSheet: View {
                         ProgressView()
                     } else {
                         Button("Add") {
-                            guard let recipeId = selectedRecipeId else { return }
                             isSaving = true
                             Task {
-                                await onSave(recipeId, servings)
+                                if entryType == .recipe, let recipeId = selectedRecipeId {
+                                    await onSaveRecipe(recipeId, servings)
+                                } else if entryType == .product, let productId = selectedProductId,
+                                          let product = allProducts.first(where: { $0.id == productId }) {
+                                    let unitName = allUnits.first(where: { $0.id == selectedUnitId })?.name
+                                    await onSaveProduct(product.name, productAmount, unitName)
+                                }
                                 dismiss()
                             }
                         }
-                        .disabled(selectedRecipeId == nil)
+                        .disabled(saveDisabled)
                         .fontWeight(.semibold)
                     }
                 }
             }
             .onAppear {
                 selectedRecipeId = recipes.first?.id
+                Task { await loadProductsIfNeeded() }
+            }
+            .onChange(of: entryType) { _, newType in
+                if newType == .product { Task { await loadProductsIfNeeded() } }
             }
         }
+    }
+
+    private var saveDisabled: Bool {
+        switch entryType {
+        case .recipe: return selectedRecipeId == nil
+        case .product: return selectedProductId == nil
+        }
+    }
+
+    // MARK: - Recipe section
+
+    private var recipeSection: some View {
+        Group {
+            Section("Recipe") {
+                if recipes.isEmpty {
+                    Text("No recipes available. Create one in the Recipes tab.")
+                        .foregroundStyle(.secondary)
+                        .font(.subheadline)
+                } else {
+                    Picker("Select Recipe", selection: $selectedRecipeId) {
+                        Text("Choose…").tag(Int?.none)
+                        ForEach(recipes) { recipe in
+                            Text(recipe.name).tag(Int?.some(recipe.id))
+                        }
+                    }
+                    .pickerStyle(.navigationLink)
+                }
+            }
+
+            Section("Servings") {
+                Stepper(value: $servings, in: 0.5...100, step: 0.5) {
+                    HStack {
+                        Text("Servings")
+                        Spacer()
+                        Text(servings.formatted(.number.precision(.fractionLength(0...1))))
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Product section
+
+    private var productSection: some View {
+        Group {
+            Section("Product") {
+                if isLoadingProducts {
+                    HStack {
+                        ProgressView()
+                        Text("Loading products…")
+                            .foregroundStyle(.secondary)
+                    }
+                } else if allProducts.isEmpty {
+                    Text("No products found.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    let selectedProduct = allProducts.first(where: { $0.id == selectedProductId })
+                    if let p = selectedProduct {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                            Text(p.name).fontWeight(.medium)
+                        }
+                    }
+                    NavigationLink("Choose Product") {
+                        List {
+                            ForEach(filteredProducts) { product in
+                                Button {
+                                    selectedProductId = product.id
+                                } label: {
+                                    HStack {
+                                        Text(product.name).foregroundStyle(.primary)
+                                        Spacer()
+                                        if selectedProductId == product.id {
+                                            Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .navigationTitle("Choose Product")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .searchable(text: $productSearch, prompt: "Search products…")
+                    }
+                }
+            }
+
+            Section("Amount") {
+                HStack {
+                    Text("Quantity")
+                    Spacer()
+                    TextField("Amount", value: $productAmount, format: .number)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 80)
+                }
+
+                if !allUnits.isEmpty {
+                    Picker("Unit", selection: $selectedUnitId) {
+                        Text("Default").tag(Int?.none)
+                        ForEach(allUnits) { unit in
+                            Text(unit.name).tag(Int?.some(unit.id))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Load
+
+    private func loadProductsIfNeeded() async {
+        guard allProducts.isEmpty, let client = appVM.client else { return }
+        isLoadingProducts = true
+        async let productsResult = try? client.getProducts()
+        async let unitsResult = try? client.getQuantityUnits()
+        allProducts = await productsResult ?? []
+        allUnits = await unitsResult ?? []
+        isLoadingProducts = false
     }
 }

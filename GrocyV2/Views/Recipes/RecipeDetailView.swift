@@ -5,9 +5,12 @@ struct RecipeDetailView: View {
     @Environment(AppViewModel.self) private var appVM
     @State private var positions: [RecipePosition] = []
     @State private var fulfillment: [RecipeFulfillment] = []
+    @State private var products: [Product] = []
+    @State private var quantityUnits: [QuantityUnit] = []
     @State private var isLoading = true
     @State private var isAddingToList = false
     @State private var isConsuming = false
+    @State private var showAddIngredient = false
     @State private var successMessage: String?
     @State private var error: String?
 
@@ -53,14 +56,25 @@ struct RecipeDetailView: View {
 
                 // Ingredients section
                 VStack(alignment: .leading, spacing: 12) {
-                    Label("Ingredients", systemImage: "list.bullet")
-                        .font(.headline)
-                        .padding(.horizontal)
+                    HStack {
+                        Label("Ingredients", systemImage: "list.bullet")
+                            .font(.headline)
+                        Spacer()
+                        Button {
+                            showAddIngredient = true
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(Color.accentColor)
+                        }
+                        .accessibilityLabel("Add ingredient")
+                    }
+                    .padding(.horizontal)
 
                     if isLoading {
                         ShimmerList(count: 4)
                     } else if positions.isEmpty {
-                        Text("No ingredients listed.")
+                        Text("No ingredients yet. Tap + to add one.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .padding(.horizontal)
@@ -71,6 +85,13 @@ struct RecipeDetailView: View {
                                     position: pos,
                                     fulfillment: fulfillment.first(where: { $0.productId == pos.productId })
                                 )
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        Task { await deletePosition(pos) }
+                                    } label: {
+                                        Label("Remove", systemImage: "trash")
+                                    }
+                                }
                             }
                         }
                         .padding(.horizontal)
@@ -141,6 +162,15 @@ struct RecipeDetailView: View {
         .navigationTitle(recipe.name)
         .navigationBarTitleDisplayMode(.large)
         .task { await loadDetails() }
+        .sheet(isPresented: $showAddIngredient) {
+            AddIngredientSheet(
+                recipeId: recipe.id,
+                products: products,
+                quantityUnits: quantityUnits
+            ) {
+                await reloadPositions()
+            }
+        }
     }
 
     // MARK: - Private methods
@@ -150,9 +180,32 @@ struct RecipeDetailView: View {
         isLoading = true
         async let posResult = try? client.getRecipePositions(recipeId: recipe.id)
         async let fulResult = try? client.getRecipeFulfillment(recipeId: recipe.id)
+        async let productsResult = try? client.getProducts()
+        async let unitsResult = try? client.getQuantityUnits()
         positions = await posResult ?? []
         fulfillment = await fulResult ?? []
+        products = await productsResult ?? []
+        quantityUnits = await unitsResult ?? []
         isLoading = false
+    }
+
+    private func reloadPositions() async {
+        guard let client = appVM.client else { return }
+        async let posResult = try? client.getRecipePositions(recipeId: recipe.id)
+        async let fulResult = try? client.getRecipeFulfillment(recipeId: recipe.id)
+        positions = await posResult ?? []
+        fulfillment = await fulResult ?? []
+    }
+
+    private func deletePosition(_ position: RecipePosition) async {
+        guard let client = appVM.client else { return }
+        do {
+            try await client.deleteRecipePosition(id: position.id)
+            withAnimation { positions.removeAll { $0.id == position.id } }
+            HapticManager.shared.success()
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 
     private func addMissingToList() async {
@@ -259,5 +312,155 @@ struct FulfillmentBar: View {
         }
         .padding(12)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+// MARK: - AddIngredientSheet
+
+struct AddIngredientSheet: View {
+    let recipeId: Int
+    let products: [Product]
+    let quantityUnits: [QuantityUnit]
+    let onSave: () async -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(AppViewModel.self) private var appVM
+
+    @State private var searchText = ""
+    @State private var selectedProductId: Int?
+    @State private var amount: Double = 1
+    @State private var selectedUnitId: Int?
+    @State private var note = ""
+    @State private var isSaving = false
+    @State private var error: String?
+
+    private var filteredProducts: [Product] {
+        searchText.isEmpty ? products : products.filter {
+            $0.name.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
+    private var selectedProduct: Product? {
+        products.first { $0.id == selectedProductId }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Ingredient") {
+                    if let product = selectedProduct {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                            Text(product.name)
+                                .fontWeight(.medium)
+                        }
+                    } else {
+                        Text("No product selected")
+                            .foregroundStyle(.secondary)
+                    }
+
+                    NavigationLink("Choose Product") {
+                        productPickerView
+                    }
+                }
+
+                Section("Amount") {
+                    HStack {
+                        Text("Quantity")
+                        Spacer()
+                        TextField("Amount", value: $amount, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                    }
+
+                    if !quantityUnits.isEmpty {
+                        Picker("Unit", selection: $selectedUnitId) {
+                            Text("Default").tag(Int?.none)
+                            ForEach(quantityUnits) { unit in
+                                Text(unit.name).tag(Int?.some(unit.id))
+                            }
+                        }
+                    }
+                }
+
+                Section("Note (optional)") {
+                    TextField("e.g. finely chopped", text: $note, axis: .vertical)
+                        .lineLimit(2...4)
+                }
+
+                if let err = error {
+                    Section {
+                        Label(err, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.red)
+                            .font(.caption)
+                    }
+                }
+            }
+            .navigationTitle("Add Ingredient")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isSaving {
+                        ProgressView()
+                    } else {
+                        Button("Add") {
+                            Task { await save() }
+                        }
+                        .disabled(selectedProductId == nil || isSaving)
+                        .fontWeight(.semibold)
+                    }
+                }
+            }
+        }
+    }
+
+    private var productPickerView: some View {
+        List {
+            ForEach(filteredProducts) { product in
+                Button {
+                    selectedProductId = product.id
+                } label: {
+                    HStack {
+                        Text(product.name)
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        if selectedProductId == product.id {
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(Color.accentColor)
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Choose Product")
+        .navigationBarTitleDisplayMode(.inline)
+        .searchable(text: $searchText, prompt: "Search products…")
+    }
+
+    private func save() async {
+        guard let client = appVM.client, let productId = selectedProductId else { return }
+        isSaving = true
+        error = nil
+        do {
+            try await client.createRecipePosition(
+                recipeId: recipeId,
+                productId: productId,
+                amount: amount,
+                quantityUnitId: selectedUnitId,
+                note: note.trimmingCharacters(in: .whitespaces).isEmpty ? nil : note
+            )
+            HapticManager.shared.success()
+            await onSave()
+            dismiss()
+        } catch {
+            self.error = error.localizedDescription
+            HapticManager.shared.error()
+        }
+        isSaving = false
     }
 }

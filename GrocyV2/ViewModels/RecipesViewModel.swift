@@ -64,6 +64,21 @@ final class RecipesViewModel {
         }
     }
 
+    func addProductToMealPlan(client: GrocyAPIClient, day: String, productName: String, amount: Double, unitName: String?) async {
+        let note: String
+        if let unit = unitName, !unit.isEmpty {
+            note = "\(productName) × \(amount.formatted(.number.precision(.fractionLength(0...2)))) \(unit)"
+        } else {
+            note = "\(productName) × \(amount.formatted(.number.precision(.fractionLength(0...2))))"
+        }
+        do {
+            try await client.addMealPlanNote(day: day, note: note)
+            await load(client: client)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
     func removeFromMealPlan(client: GrocyAPIClient, id: Int) async {
         do {
             try await client.deleteMealPlanItem(id: id)
