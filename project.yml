@@ -1,0 +1,56 @@
+name: GrocyV2
+options:
+  bundleIdPrefix: com.dbzx6r
+  deploymentTarget:
+    iOS: "26.0"
+  xcodeVersion: "26.2"
+  generateEmptyDirectories: true
+  createIntermediateGroups: true
+  usesTabs: false
+  indentWidth: 4
+  tabWidth: 4
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    PRODUCT_BUNDLE_IDENTIFIER: com.dbzx6r.grocy-v2
+    SWIFT_STRICT_CONCURRENCY: complete
+    ENABLE_PREVIEWS: YES
+
+targets:
+  GrocyV2:
+    type: application
+    platform: iOS
+    sources:
+      - GrocyV2
+    info:
+      path: GrocyV2/Resources/Info.plist
+      properties:
+        CFBundleName: Grocy v2
+        CFBundleDisplayName: Grocy v2
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        UILaunchStoryboardName: ""
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSCameraUsageDescription: "Grocy v2 uses your camera to scan product barcodes."
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.dbzx6r.grocy-v2
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+        ENABLE_HARDENED_RUNTIME: NO
+    entitlements:
+      path: GrocyV2/Resources/GrocyV2.entitlements
+      properties:
+        keychain-access-groups:
+          - "$(AppIdentifierPrefix)com.dbzx6r.grocy-v2"
