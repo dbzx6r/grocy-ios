@@ -11,6 +11,11 @@ struct SystemInfo: Codable {
     struct GrocyVersion: Codable {
         let version: String
         let releaseDate: String
+        
+        enum CodingKeys: String, CodingKey {
+            case version = "Version"
+            case releaseDate = "ReleaseDate"
+        }
     }
 }
 

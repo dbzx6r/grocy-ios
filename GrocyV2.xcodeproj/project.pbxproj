@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -86,7 +86,7 @@
 		A193A0715B010708306780EF /* DateFormatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateFormatters.swift; sourceTree = "<group>"; };
 		A5972D0A98594F6373A5F5A4 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
 		B0D4EA913E38C6C23E737E8A /* ChoreRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoreRow.swift; sourceTree = "<group>"; };
-		B235E6A38B7AE2D473EFA40B /* GrocyV2.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = GrocyV2.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B235E6A38B7AE2D473EFA40B /* GrocyV2.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GrocyV2.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BF3DA38FA9FBDF6FE33B6028 /* DemoIntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoIntroView.swift; sourceTree = "<group>"; };
 		C4F197992660B0FBC3891B10 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		CB05E0E68D004ED09547DA10 /* TaskRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskRow.swift; sourceTree = "<group>"; };
@@ -332,7 +332,6 @@
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
 					503F8D50CCF4E499A44A01D2 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -347,7 +346,6 @@
 			);
 			mainGroup = 2C7ED04888BFF65B7D681FA3;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -428,9 +426,10 @@
 				CODE_SIGN_ENTITLEMENTS = GrocyV2/Resources/GrocyV2.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = V6Q6Z5WZZK;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = GrocyV2/Resources/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -449,9 +448,10 @@
 				CODE_SIGN_ENTITLEMENTS = GrocyV2/Resources/GrocyV2.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = V6Q6Z5WZZK;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = GrocyV2/Resources/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
