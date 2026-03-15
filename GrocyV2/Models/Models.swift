@@ -247,6 +247,7 @@ struct PutAwayEntry: Identifiable {
     var amount: Double
     var hasExpiry: Bool
     var expiryDate: Date
+    var locationId: Int?  // Grocy storage location
     var price: String     // free-form string; converted to Double? on submit
 
     var bestBeforeDateString: String {

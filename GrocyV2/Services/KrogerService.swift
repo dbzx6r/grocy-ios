@@ -41,6 +41,7 @@ enum KrogerServiceError: LocalizedError {
     case authFailed(String)
     case notFound
     case noLocation
+    case locationNotFound
 
     var errorDescription: String? {
         switch self {
@@ -48,6 +49,7 @@ enum KrogerServiceError: LocalizedError {
         case .authFailed(let detail): return detail
         case .notFound: return "Price not found for this product."
         case .noLocation: return "Set your zip code in Settings → Price Lookup to enable store pricing."
+        case .locationNotFound: return "No Kroger store found near your zip code. Try a nearby zip."
         }
     }
 }
@@ -75,8 +77,10 @@ actor KrogerService {
         guard !zipCode.isEmpty else { throw KrogerServiceError.noLocation }
 
         let token = try await getToken(clientId: clientId, clientSecret: clientSecret)
-        let location = try await lookupLocation(zip: zipCode, token: token)
-        return try await fetchPrice(searchTerm: searchTerm, locationId: location?.id, token: token, storeName: location?.name)
+        guard let location = try await lookupLocation(zip: zipCode, token: token) else {
+            throw KrogerServiceError.locationNotFound
+        }
+        return try await fetchPrice(searchTerm: searchTerm, locationId: location.id, token: token, storeName: location.name)
     }
 
     func testConnection(clientId: String, clientSecret: String) async throws {
@@ -124,7 +128,7 @@ actor KrogerService {
     private func lookupLocation(zip: String, token: String) async throws -> (id: String, name: String?)? {
         guard var comps = URLComponents(string: "\(baseURL)/locations") else { return nil }
         comps.queryItems = [
-            URLQueryItem(name: "filter.zipCode", value: zip),
+            URLQueryItem(name: "filter.zipCode.near", value: zip),
             URLQueryItem(name: "filter.limit", value: "1")
         ]
         guard let url = comps.url else { return nil }

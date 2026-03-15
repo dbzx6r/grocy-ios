@@ -13,6 +13,7 @@ final class ShoppingViewModel {
     var products: [Product] = []
     var productGroups: [ProductGroup] = []
     var quantityUnits: [QuantityUnit] = []
+    var locations: [Location] = []
 
     var pendingItems: [ShoppingListItem] {
         items.filter { !$0.isDone }
@@ -48,11 +49,13 @@ final class ShoppingViewModel {
             async let productsResult = client.getProducts()
             async let groupsResult = client.getProductGroups()
             async let unitsResult = client.getQuantityUnits()
-            let (fetchedLists, fetchedProducts, fetchedGroups, fetchedUnits) = try await (listsResult, productsResult, groupsResult, unitsResult)
+            async let locationsResult = client.getLocations()
+            let (fetchedLists, fetchedProducts, fetchedGroups, fetchedUnits, fetchedLocations) = try await (listsResult, productsResult, groupsResult, unitsResult, locationsResult)
             shoppingLists = fetchedLists
             products = fetchedProducts
             productGroups = fetchedGroups
             quantityUnits = fetchedUnits
+            locations = fetchedLocations
 
             // Correct selectedListId to a real list ID if the default (1) doesn't exist
             if !shoppingLists.isEmpty && !shoppingLists.contains(where: { $0.id == selectedListId }) {
@@ -116,8 +119,9 @@ final class ShoppingViewModel {
         }
     }
 
-    /// Called from PutAwayView: purchase each item into stock, then clear done items from the list.
+    /// Called from PutAwayView: purchase each item into stock, then remove the done items from the list.
     func putAway(client: GrocyAPIClient, entries: [PutAwayEntry]) async throws {
+        // Step 1: add all items to stock concurrently
         try await withThrowingTaskGroup(of: Void.self) { group in
             for entry in entries {
                 group.addTask {
@@ -125,13 +129,19 @@ final class ShoppingViewModel {
                         productId: entry.productId,
                         amount: entry.amount,
                         bestBeforeDate: entry.bestBeforeDateString,
-                        price: entry.priceDouble
+                        price: entry.priceDouble,
+                        locationId: entry.locationId
                     )
                 }
             }
             try await group.waitForAll()
         }
-        try await client.clearShoppingList(listId: selectedListId, doneItemsOnly: true)
+        // Step 2: delete each processed shopping list item by ID (more reliable than bulk clear)
+        await withTaskGroup(of: Void.self) { group in
+            for entry in entries {
+                group.addTask { try? await client.deleteShoppingListItem(id: entry.id) }
+            }
+        }
         await load(client: client)
     }
 

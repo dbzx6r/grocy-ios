@@ -86,12 +86,15 @@ struct PutAwayView: View {
         // Build entries synchronously with name/expiry info
         var built: [PutAwayEntry] = vm.doneItems.compactMap { item -> PutAwayEntry? in
             guard let productId = item.productId else { return nil }
-            let name = item.product?.name ?? vm.products.first(where: { $0.id == productId })?.name ?? "Product #\(productId)"
-            let defaultDays = item.product?.defaultBestBeforeDays ?? 0
+            let product = item.product ?? vm.products.first(where: { $0.id == productId })
+            let name = product?.name ?? "Product #\(productId)"
+            let defaultDays = product?.defaultBestBeforeDays ?? 0
             let hasExpiry = defaultDays > 0
             let expiryDate: Date = hasExpiry
                 ? Calendar.current.date(byAdding: .day, value: defaultDays, to: .now) ?? .now
                 : .now
+            // Pre-fill the product's default location if set
+            let defaultLocationId = product?.locationId
             return PutAwayEntry(
                 id: item.id,
                 productId: productId,
@@ -100,6 +103,7 @@ struct PutAwayView: View {
                 amount: item.amount,
                 hasExpiry: hasExpiry,
                 expiryDate: expiryDate,
+                locationId: defaultLocationId,
                 price: ""
             )
         }
@@ -146,6 +150,7 @@ struct PutAwayView: View {
 
 private struct PutAwayRow: View {
     @Binding var entry: PutAwayEntry
+    @Environment(ShoppingViewModel.self) private var vm
     @FocusState private var priceFocused: Bool
 
     @State private var isFetchingPrice = false
@@ -216,9 +221,12 @@ private struct PutAwayRow: View {
                         NavigationLink {
                             SettingsView()
                         } label: {
-                            Label("Add zip code in Settings →", systemImage: "location")
-                                .font(.caption2)
-                                .foregroundStyle(.orange)
+                            Label(
+                                priceFetchError ?? "Add zip code in Settings →",
+                                systemImage: "location"
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
                         }
                         .buttonStyle(.plain)
                     } else if let err = priceFetchError {
@@ -246,6 +254,34 @@ private struct PutAwayRow: View {
             }
 
             Divider().padding(.vertical, 8)
+
+            // Storage location
+            if !vm.locations.isEmpty {
+                HStack {
+                    Label("Store In", systemImage: "archivebox")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Menu {
+                        Button("No specific location") { entry.locationId = nil }
+                        Divider()
+                        ForEach(vm.locations) { loc in
+                            Button(loc.name) { entry.locationId = loc.id }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(vm.locations.first(where: { $0.id == entry.locationId })?.name ?? "Any")
+                                .font(.subheadline)
+                                .foregroundStyle(entry.locationId != nil ? .primary : .secondary)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+                Divider().padding(.vertical, 8)
+            }
 
             // Best Before toggle
             HStack {
@@ -297,9 +333,10 @@ private struct PutAwayRow: View {
                     priceSource = "via Kroger\(store)"
                     isFetchingPrice = false
                 }
-            } catch KrogerServiceError.noLocation {
+            } catch KrogerServiceError.noLocation, KrogerServiceError.locationNotFound {
                 await MainActor.run {
                     needsZipCode = true
+                    priceFetchError = KrogerServiceError.locationNotFound.localizedDescription
                     isFetchingPrice = false
                 }
             } catch KrogerServiceError.notFound {
@@ -315,7 +352,7 @@ private struct PutAwayRow: View {
                                 priceSource = "via Kroger\(store)"
                                 isFetchingPrice = false
                             }
-                        } catch KrogerServiceError.noLocation {
+                        } catch KrogerServiceError.noLocation, KrogerServiceError.locationNotFound {
                             await MainActor.run {
                                 needsZipCode = true
                                 isFetchingPrice = false
@@ -335,7 +372,7 @@ private struct PutAwayRow: View {
                 }
             } catch {
                 await MainActor.run {
-                    priceFetchError = "Lookup failed"
+                    priceFetchError = error.localizedDescription
                     isFetchingPrice = false
                 }
             }
