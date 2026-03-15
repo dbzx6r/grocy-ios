@@ -274,9 +274,8 @@ struct ProductDetailView: View {
 
     private var expiryText: String {
         guard let date = stockItem.bestBeforeDate, date != "2999-12-31" else { return "No date" }
-        return DateFormatters.shared.displayShort.string(
-            from: DateFormatters.shared.apiDate.date(from: date) ?? .now
-        )
+        guard let parsed = DateFormatters.shared.apiDate.date(from: date) else { return "Unknown" }
+        return DateFormatters.shared.displayShort.string(from: parsed)
     }
 
     private var expiryColor: Color {

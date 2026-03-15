@@ -166,7 +166,7 @@ struct BarcodeScannerView: View {
         cameraPermission = AVCaptureDevice.authorizationStatus(for: .video)
         if cameraPermission == .notDetermined {
             AVCaptureDevice.requestAccess(for: .video) { granted in
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     cameraPermission = granted ? .authorized : .denied
                 }
             }
@@ -291,8 +291,8 @@ struct DataScannerRepresentable: UIViewControllerRepresentable {
                     else { continue }
                     lastScanned = value
                     lastScanTime = now
-                    DispatchQueue.main.async {
-                        self.scannedBarcode = value
+                    Task { @MainActor [weak self] in
+                        self?.scannedBarcode = value
                     }
                 }
             }

@@ -37,7 +37,7 @@ struct ConfettiBurst: View {
                 x: center.x + CGFloat.random(in: -20...20),
                 y: center.y,
                 rotation: Double.random(in: 0...360),
-                color: colors.randomElement()!,
+                color: colors.randomElement() ?? .green,
                 scale: CGFloat.random(in: 0.5...1.5),
                 opacity: 1.0
             )
