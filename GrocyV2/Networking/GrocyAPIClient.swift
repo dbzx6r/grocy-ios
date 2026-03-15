@@ -351,7 +351,7 @@ final class GrocyAPIClient {
     /// Fetches product info from Open Food Facts (free, no auth required).
     /// Returns nil if the barcode is not in the OFF database.
     func fetchOpenFoodFacts(barcode: String) async throws -> OFFProduct? {
-        let fields = "product_name,brands,quantity,nutriments,image_front_url"
+        let fields = "product_name,product_name_en,brands,quantity,nutriments,image_front_url"
         guard let url = URL(string: "https://world.openfoodfacts.org/api/v2/product/\(barcode).json?fields=\(fields)") else {
             return nil
         }
@@ -360,11 +360,33 @@ final class GrocyAPIClient {
         req.timeoutInterval = 10
         let (data, _) = try await URLSession.shared.data(for: req)
         let offDecoder = JSONDecoder()
-        // OFF uses camelCase field names except for nutriments which has custom keys
         let response = try offDecoder.decode(OFFResponse.self, from: data)
         guard response.status == 1, let product = response.product,
               !product.displayName.isEmpty else { return nil }
         return product
+    }
+
+    /// Fetches product info from UPC Item DB — better coverage for US grocery products.
+    /// Returns nil if not found or rate-limited.
+    func fetchUPCItemDB(barcode: String) async throws -> OFFProduct? {
+        guard let url = URL(string: "https://api.upcitemdb.com/prod/trial/lookup?upc=\(barcode)") else { return nil }
+        var req = URLRequest(url: url)
+        req.setValue("GrocyV2/1.0 (iOS)", forHTTPHeaderField: "User-Agent")
+        req.timeoutInterval = 10
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 { return nil }
+        let decoded = try JSONDecoder().decode(UPCItemDBResponse.self, from: data)
+        guard decoded.code == "OK", let item = decoded.items?.first,
+              let name = item.title, !name.isEmpty else { return nil }
+        // Map to OFFProduct so the rest of the UI can treat it uniformly
+        return OFFProduct(
+            productName: name,
+            productNameEn: nil,
+            brands: item.brand,
+            quantity: item.size,
+            nutriments: nil,
+            imageFrontUrl: item.images?.first
+        )
     }
 
     // MARK: - Product Creation

@@ -34,7 +34,7 @@ struct BarcodeScannerView: View {
 
             ScannerOverlay()
 
-            // Top bar
+            // Top bar — only our title; DataScannerViewController guidance is disabled
             VStack {
                 HStack {
                     Button {
@@ -46,7 +46,7 @@ struct BarcodeScannerView: View {
                             .background(Color.black.opacity(0.4), in: Circle())
                     }
                     Spacer()
-                    Text(onProductPicked != nil ? "Scan to Select Product" : "Scan Barcode")
+                    Text("Scan Barcode")
                         .font(.headline)
                         .foregroundStyle(.white)
                     Spacer()
@@ -56,7 +56,7 @@ struct BarcodeScannerView: View {
                 Spacer()
             }
 
-            // Camera warm-up overlay — hides auto-exposure burst
+            // Camera warm-up overlay — hidden once AE has stabilised
             if !cameraReady {
                 Color.black
                     .ignoresSafeArea()
@@ -78,7 +78,16 @@ struct BarcodeScannerView: View {
                 resultPanel
             }
         }
-        .onAppear { checkCameraPermission() }
+        .task {
+            // Permission check
+            cameraPermission = AVCaptureDevice.authorizationStatus(for: .video)
+            if cameraPermission == .notDetermined {
+                let granted = await AVCaptureDevice.requestAccess(for: .video)
+                cameraPermission = granted ? .authorized : .denied
+            }
+            // Wait for camera auto-exposure to stabilise before revealing preview
+            await warmUpCamera()
+        }
         .onChange(of: scannedBarcode) { _, newValue in
             guard let barcode = newValue else { return }
             Task { await lookupBarcode(barcode) }
@@ -200,20 +209,26 @@ struct BarcodeScannerView: View {
 
     // MARK: - Private helpers
 
-    private func checkCameraPermission() {
-        cameraPermission = AVCaptureDevice.authorizationStatus(for: .video)
-        if cameraPermission == .notDetermined {
-            AVCaptureDevice.requestAccess(for: .video) { granted in
-                Task { @MainActor in
-                    cameraPermission = granted ? .authorized : .denied
-                }
+    /// Polls AVCaptureDevice.isAdjustingExposure until the camera AE has settled,
+    /// then fades out the warm-up overlay.  Hard fallback at 5 seconds.
+    private func warmUpCamera() async {
+        let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
+        let deadline = Date().addingTimeInterval(5.0)
+        var stableCount = 0
+        // Require 5 consecutive 100 ms intervals of AE being stable (= 500 ms stability)
+        let requiredStable = 5
+
+        while Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(100))
+            if let dev = device, !dev.isAdjustingExposure {
+                stableCount += 1
+                if stableCount >= requiredStable { break }
+            } else {
+                stableCount = 0
             }
         }
-        // Fade out the warm-up overlay after camera has had time to calibrate exposure
-        Task {
-            try? await Task.sleep(for: .seconds(1.5))
-            withAnimation(.easeOut(duration: 0.5)) { cameraReady = true }
-        }
+
+        withAnimation(.easeOut(duration: 0.5)) { cameraReady = true }
     }
 
     private func lookupBarcode(_ barcode: String) async {
@@ -227,8 +242,13 @@ struct BarcodeScannerView: View {
         do {
             foundProduct = try await client.getProductByBarcode(barcode)
         } catch NetworkError.notFound {
-            // Not in Grocy — try Open Food Facts
-            offProduct = try? await client.fetchOpenFoodFacts(barcode: barcode)
+            // Not in Grocy — try Open Food Facts first, then UPC Item DB as fallback
+            if let result = try? await client.fetchOpenFoodFacts(barcode: barcode) {
+                offProduct = result
+            } else {
+                // UPC Item DB has better coverage for US grocery barcodes
+                offProduct = try? await client.fetchUPCItemDB(barcode: barcode)
+            }
             notFound = true
         } catch {
             notFound = true
@@ -299,11 +319,11 @@ struct DataScannerRepresentable: UIViewControllerRepresentable {
             recognizesMultipleItems: false,
             isHighFrameRateTrackingEnabled: false,
             isPinchToZoomEnabled: true,
-            isGuidanceEnabled: true,
-            isHighlightingEnabled: true
+            isGuidanceEnabled: false,       // we have our own title; no "Find Nearby Barcodes" text
+            isHighlightingEnabled: false    // no green rectangle drawn around detected barcodes
         )
         vc.delegate = context.coordinator
-        // Delay scan start so camera AE stabilizes — prevents overexposed startup frames
+        // Delay scan start so camera AE stabilizes — warmUpCamera() handles the overlay
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             try? vc.startScanning()
         }

@@ -434,6 +434,7 @@ struct OFFResponse: Codable {
 
 struct OFFProduct: Codable {
     let productName: String?
+    let productNameEn: String?   // fallback: some products only have English name here
     let brands: String?
     let quantity: String?
     let nutriments: OFFNutriments?
@@ -441,6 +442,7 @@ struct OFFProduct: Codable {
 
     enum CodingKeys: String, CodingKey {
         case productName = "product_name"
+        case productNameEn = "product_name_en"
         case brands
         case quantity
         case nutriments
@@ -448,7 +450,9 @@ struct OFFProduct: Codable {
     }
 
     var displayName: String {
-        productName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let name = productName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !name.isEmpty { return name }
+        return productNameEn?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
     var kcalPer100g: Double? {
@@ -462,6 +466,20 @@ struct OFFProduct: Codable {
             case energyKcal100g = "energy-kcal_100g"
         }
     }
+}
+
+// MARK: - UPC Item DB (fallback for US products)
+
+struct UPCItemDBResponse: Codable {
+    let code: String
+    let items: [UPCItemDBItem]?
+}
+
+struct UPCItemDBItem: Codable {
+    let title: String?
+    let brand: String?
+    let size: String?
+    let images: [String]?
 }
 
 // MARK: - API Responses
