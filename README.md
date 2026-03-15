@@ -227,7 +227,6 @@ Please keep PRs focused — one feature or fix per PR.
 - [grocy/grocy](https://github.com/grocy/grocy) — the Grocy server (PHP)
 - [grocy/grocy-docker](https://github.com/grocy/grocy-docker) — official Docker images
 - [grocy/grocy-android](https://github.com/grocy/grocy-android) — the official Android client
-- [dbzx6r/homelab](https://github.com/dbzx6r/homelab) — the homelab config this was built alongside
 
 ---
 
