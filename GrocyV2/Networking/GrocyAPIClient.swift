@@ -381,8 +381,11 @@ final class GrocyAPIClient {
     }
     
     func addRecipeMissingToShoppingList(recipeId: Int, servings: Double? = nil) async throws {
-        struct Body: Encodable { let recipeId: Int; let servings: Double? }
-        let data = try encoder.encode(Body(recipeId: recipeId, servings: servings))
+        // Only include servings when explicitly overriding; send empty body otherwise.
+        // Sending recipe_id in the body or null for servings causes some Grocy builds to
+        // calculate 0-quantity additions and silently add nothing.
+        let bodyDict: [String: Double] = servings.map { ["servings": $0] } ?? [:]
+        let data = try JSONSerialization.data(withJSONObject: bodyDict)
         let req = try request("/recipes/\(recipeId)/add-not-fulfilled-products-to-shoppinglist", method: "POST", body: data)
         try await performVoid(req)
     }

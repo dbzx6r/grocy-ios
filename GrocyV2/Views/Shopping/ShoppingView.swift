@@ -105,7 +105,7 @@ struct ShoppingView: View {
         }
         .task {
             guard let client = appVM.client else { return }
-            if vm.items.isEmpty { await vm.load(client: client) }
+            await vm.load(client: client)
         }
         .onChange(of: vm.selectedListId) { _, _ in
             guard let client = appVM.client else { return }
