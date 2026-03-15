@@ -140,13 +140,13 @@ actor KrogerService {
         return (id: first.locationId, name: first.name)
     }
 
-    private func fetchPrice(searchTerm: String, locationId: String?, token: String, storeName: String?) async throws -> KrogerPrice {
+    private func fetchPrice(searchTerm: String, locationId: String, token: String, storeName: String?) async throws -> KrogerPrice {
         guard var comps = URLComponents(string: "\(baseURL)/products") else { throw KrogerServiceError.notFound }
-        var queryItems = [URLQueryItem(name: "filter.term", value: searchTerm)]
-        if let locationId {
-            queryItems.append(URLQueryItem(name: "filter.locationId", value: locationId))
-        }
-        comps.queryItems = queryItems
+        comps.queryItems = [
+            URLQueryItem(name: "filter.term", value: searchTerm),
+            URLQueryItem(name: "filter.locationId", value: locationId),
+            URLQueryItem(name: "filter.limit", value: "1")   // cap to best match; prevents different results per call
+        ]
         guard let url = comps.url else { throw KrogerServiceError.notFound }
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -156,7 +156,7 @@ actor KrogerService {
             throw KrogerServiceError.notFound
         }
         let productsResponse = try decoder.decode(KrogerProductsResponse.self, from: data)
-        // Products may be returned but without price if locationId is missing or item isn't sold at that store
+        // Products returned without price means the item isn't stocked at this store
         guard let price = productsResponse.data.first?.items?.first?.price else {
             throw KrogerServiceError.notFound
         }

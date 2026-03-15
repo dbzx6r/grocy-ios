@@ -247,7 +247,8 @@ private struct PutAwayRow: View {
                                 .font(.caption.weight(.medium))
                         }
                         .buttonStyle(.borderless)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(priceSource != nil ? .secondary : Color.accentColor)
+                        .disabled(priceSource != nil)   // locked once a price is confirmed
                     }
                 }
                 .padding(.top, 4)
@@ -321,7 +322,8 @@ private struct PutAwayRow: View {
         priceSource = nil
         priceFetchError = nil
         needsZipCode = false
-        // Prefer UPC barcode for exact Kroger match; fall back to product name
+        // When a UPC barcode is available use it exclusively — name fallback can match
+        // a different product entirely and return inconsistent prices on repeated presses.
         let searchTerm = entry.barcode ?? entry.productName
         Task {
             do {
@@ -338,37 +340,6 @@ private struct PutAwayRow: View {
                     needsZipCode = true
                     priceFetchError = KrogerServiceError.locationNotFound.localizedDescription
                     isFetchingPrice = false
-                }
-            } catch KrogerServiceError.notFound {
-                // If UPC search failed and we haven't tried name yet, retry with name
-                if entry.barcode != nil {
-                    Task {
-                        do {
-                            let result = try await KrogerService.shared.lookupPrice(searchTerm: entry.productName)
-                            let displayPrice = result.promo ?? result.regular
-                            await MainActor.run {
-                                entry.price = String(format: "%.2f", displayPrice)
-                                let store = result.storeName.map { " · \($0)" } ?? ""
-                                priceSource = "via Kroger\(store)"
-                                isFetchingPrice = false
-                            }
-                        } catch KrogerServiceError.noLocation, KrogerServiceError.locationNotFound {
-                            await MainActor.run {
-                                needsZipCode = true
-                                isFetchingPrice = false
-                            }
-                        } catch {
-                            await MainActor.run {
-                                priceFetchError = "Price not found"
-                                isFetchingPrice = false
-                            }
-                        }
-                    }
-                } else {
-                    await MainActor.run {
-                        priceFetchError = "Price not found"
-                        isFetchingPrice = false
-                    }
                 }
             } catch {
                 await MainActor.run {
