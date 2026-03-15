@@ -700,55 +700,92 @@ struct ImportProductCard: View {
         isImporting = true
         importError = nil
         do {
-            async let qusTask = client.getQuantityUnits()
-            async let locsTask = client.getLocations()
-            async let productsTask = client.getProducts()
-            let (qus, locs, existingProducts) = try await (qusTask, locsTask, productsTask)
-
-            guard let defaultQu = qus.first else {
-                importError = "No quantity units found. Set up quantity units in Grocy first."
-                isImporting = false
-                return
-            }
-            guard let defaultLoc = locs.first else {
-                importError = "No locations found. Set up at least one location in Grocy first."
-                isImporting = false
-                return
-            }
-
-            // If a product with this name already exists, reuse it instead of creating a duplicate
-            let productId: Int
-            if let existing = existingProducts.first(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }) {
-                productId = existing.id
-            } else {
-                let descParts = [
-                    offProduct.brands?.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces),
-                    offProduct.quantity
-                ].compactMap { $0 }.filter { !$0.isEmpty }
-                let desc: String? = descParts.isEmpty ? nil : descParts.joined(separator: " — ")
-
-                productId = try await client.createProduct(
-                    name: name,
-                    calories: offProduct.kcalPer100g,
-                    description: desc,
-                    defaultQuId: defaultQu.id,
-                    defaultLocationId: defaultLoc.id
-                )
-            }
-
-            // Link barcode (ignore duplicate-barcode errors gracefully)
-            try? await client.linkBarcode(productId: productId, barcode: barcode)
-
-            let details = try await client.getProductDetails(id: productId)
-            HapticManager.shared.success()
-            withAnimation { importedProduct = details.product }
-            try? await Task.sleep(for: .seconds(1.2))
-            onImported(details.product)
+            try await importToGrocyAttempt(client: client, name: name)
         } catch {
             importError = "Import failed: \(error.localizedDescription)"
             HapticManager.shared.error()
         }
         isImporting = false
+    }
+
+    /// Core import logic with up to 3 automatic retries for transient server errors.
+    /// Home-lab servers (RPi, NAS) can return malformed responses under load; retrying
+    /// 400 ms later resolves the issue without any user action.
+    private func importToGrocyAttempt(client: GrocyAPIClient, name: String) async throws {
+        var lastError: Error?
+        for attempt in 0..<3 {
+            do {
+                try await _importToGrocy(client: client, name: name)
+                return
+            } catch NetworkError.decodingError, NetworkError.invalidResponse {
+                lastError = NetworkError.decodingError(
+                    NSError(domain: "parse", code: 0,
+                            userInfo: [NSLocalizedDescriptionKey: "Could not parse server response."])
+                )
+                if attempt < 2 {
+                    try? await Task.sleep(for: .milliseconds(400))
+                }
+            }
+        }
+        throw lastError ?? NetworkError.invalidResponse
+    }
+
+    private func _importToGrocy(client: GrocyAPIClient, name: String) async throws {
+        async let qusTask = client.getQuantityUnits()
+        async let locsTask = client.getLocations()
+        async let productsTask = client.getProducts()
+        let (qus, locs, existingProducts) = try await (qusTask, locsTask, productsTask)
+
+        guard let defaultQu = qus.first else {
+            throw ImportError.missingQuantityUnits
+        }
+        guard let defaultLoc = locs.first else {
+            throw ImportError.missingLocations
+        }
+
+        // If a product with this name already exists, reuse it instead of creating a duplicate
+        let productId: Int
+        if let existing = existingProducts.first(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }) {
+            productId = existing.id
+        } else {
+            let descParts = [
+                offProduct.brands?.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces),
+                offProduct.quantity
+            ].compactMap { $0 }.filter { !$0.isEmpty }
+            let desc: String? = descParts.isEmpty ? nil : descParts.joined(separator: " — ")
+
+            productId = try await client.createProduct(
+                name: name,
+                calories: offProduct.kcalPer100g,
+                description: desc,
+                defaultQuId: defaultQu.id,
+                defaultLocationId: defaultLoc.id
+            )
+        }
+
+        // Link barcode (ignore duplicate-barcode errors gracefully)
+        try? await client.linkBarcode(productId: productId, barcode: barcode)
+
+        // Small pause to let the Grocy server finish writing before reading details
+        try? await Task.sleep(for: .milliseconds(200))
+
+        let details = try await client.getProductDetails(id: productId)
+        HapticManager.shared.success()
+        withAnimation { importedProduct = details.product }
+        try? await Task.sleep(for: .seconds(1.2))
+        onImported(details.product)
+    }
+
+    private enum ImportError: LocalizedError {
+        case missingQuantityUnits
+        case missingLocations
+
+        var errorDescription: String? {
+            switch self {
+            case .missingQuantityUnits: return "No quantity units found. Set up quantity units in Grocy first."
+            case .missingLocations: return "No locations found. Set up at least one location in Grocy first."
+            }
+        }
     }
 }
 
