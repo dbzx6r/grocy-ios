@@ -15,7 +15,7 @@ struct BarcodeScannerView: View {
     @State private var notFound = false
     @State private var actionResult: String?
     @State private var isPerformingAction = false
-    @State private var externalLookup: ExternalBarcodeLookup?
+    @State private var offProduct: OFFProduct?       // Open Food Facts result
     @State private var cameraPermission: AVAuthorizationStatus = .notDetermined
     @State private var cameraReady = false
 
@@ -118,13 +118,31 @@ struct BarcodeScannerView: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
 
             } else if notFound {
-                NotFoundCard(
-                    barcode: scannedBarcode ?? "",
-                    externalInfo: externalLookup,
-                    onDismiss: { resetScan() }
-                )
-                .padding()
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                if let off = offProduct {
+                    // OFF has data — offer auto-import
+                    ImportProductCard(
+                        offProduct: off,
+                        barcode: scannedBarcode ?? "",
+                        onImported: { product in
+                            if let pick = onProductPicked {
+                                pick(product)
+                                dismiss()
+                            } else {
+                                resetScan()
+                            }
+                        },
+                        onDismiss: { resetScan() }
+                    )
+                    .padding()
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                } else {
+                    NotFoundCard(
+                        barcode: scannedBarcode ?? "",
+                        onDismiss: { resetScan() }
+                    )
+                    .padding()
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: foundProduct?.product.id)
@@ -203,12 +221,14 @@ struct BarcodeScannerView: View {
         isSearching = true
         notFound = false
         foundProduct = nil
+        offProduct = nil
         actionResult = nil
         HapticManager.shared.impact(.medium)
         do {
             foundProduct = try await client.getProductByBarcode(barcode)
         } catch NetworkError.notFound {
-            externalLookup = try? await client.lookupExternalBarcode(barcode)
+            // Not in Grocy — try Open Food Facts
+            offProduct = try? await client.fetchOpenFoodFacts(barcode: barcode)
             notFound = true
         } catch {
             notFound = true
@@ -263,7 +283,7 @@ struct BarcodeScannerView: View {
         foundProduct = nil
         notFound = false
         actionResult = nil
-        externalLookup = nil
+        offProduct = nil
     }
 }
 
@@ -521,18 +541,211 @@ struct ProductFoundCard: View {
     }
 }
 
+// MARK: - ImportProductCard
+
+struct ImportProductCard: View {
+    let offProduct: OFFProduct
+    let barcode: String
+    let onImported: (Product) -> Void
+    let onDismiss: () -> Void
+
+    @Environment(AppViewModel.self) private var appVM
+    @State private var productName: String
+    @State private var isImporting = false
+    @State private var importError: String?
+    @State private var importedProduct: Product?
+
+    init(offProduct: OFFProduct, barcode: String, onImported: @escaping (Product) -> Void, onDismiss: @escaping () -> Void) {
+        self.offProduct = offProduct
+        self.barcode = barcode
+        self.onImported = onImported
+        self.onDismiss = onDismiss
+        // Pre-fill with brand + name for a clean product name
+        let name: String
+        if let brand = offProduct.brands?.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces),
+           !brand.isEmpty, let pn = offProduct.productName, !pn.isEmpty {
+            name = "\(brand) \(pn)"
+        } else {
+            name = offProduct.displayName
+        }
+        _productName = State(initialValue: name)
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            // Header
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(Color.accentColor)
+                            .font(.caption.weight(.bold))
+                        Text("Found on Open Food Facts")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.accentColor)
+                    }
+                    Text("Barcode: \(barcode)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .font(.title3)
+                }
+            }
+
+            // OFF product details
+            HStack(spacing: 12) {
+                if let imgUrl = offProduct.imageFrontUrl, let url = URL(string: imgUrl) {
+                    AsyncImage(url: url) { phase in
+                        if case .success(let img) = phase {
+                            img.resizable().scaledToFill()
+                                .frame(width: 60, height: 60)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        } else {
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.accentColor.opacity(0.1))
+                                .frame(width: 60, height: 60)
+                                .overlay(Image(systemName: "photo").foregroundStyle(.secondary))
+                        }
+                    }
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    if let brand = offProduct.brands?.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) {
+                        Text(brand)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(offProduct.displayName)
+                        .font(.subheadline.weight(.medium))
+                        .lineLimit(2)
+                    HStack(spacing: 10) {
+                        if let qty = offProduct.quantity {
+                            Label(qty, systemImage: "scalemass.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        if let kcal = offProduct.kcalPer100g {
+                            Label(String(format: "%.0f kcal/100g", kcal), systemImage: "flame.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+
+            Divider()
+
+            // Editable product name
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Product name in Grocy")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                TextField("Product name", text: $productName)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.subheadline)
+            }
+
+            // Error
+            if let err = importError {
+                Label(err, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.leading)
+            }
+
+            // Import button
+            if let imported = importedProduct {
+                Label("\"\(imported.name)\" imported!", systemImage: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.green)
+                    .frame(maxWidth: .infinity)
+            } else {
+                Button {
+                    Task { await importToGrocy() }
+                } label: {
+                    HStack {
+                        if isImporting {
+                            ProgressView().tint(.white)
+                        } else {
+                            Image(systemName: "square.and.arrow.down.fill")
+                        }
+                        Text(isImporting ? "Importing…" : "Import to Grocy")
+                            .font(.headline)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(productName.trimmingCharacters(in: .whitespaces).isEmpty ? Color.secondary.opacity(0.3) : Color.accentColor, in: RoundedRectangle(cornerRadius: 14))
+                    .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+                .disabled(isImporting || productName.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(20)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: -5)
+    }
+
+    private func importToGrocy() async {
+        guard let client = appVM.client else { return }
+        let name = productName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        isImporting = true
+        importError = nil
+        do {
+            // Get quantity units to find a default QU id
+            let qus = try await client.getQuantityUnits()
+            guard let defaultQu = qus.first else {
+                importError = "No quantity units found. Set up quantity units in Grocy first."
+                isImporting = false
+                return
+            }
+            // Build a description from brand + quantity
+            let descParts = [
+                offProduct.brands?.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces),
+                offProduct.quantity
+            ].compactMap { $0 }.filter { !$0.isEmpty }
+            let desc: String? = descParts.isEmpty ? nil : descParts.joined(separator: " — ")
+
+            // Create product in Grocy
+            let productId = try await client.createProduct(
+                name: name,
+                calories: offProduct.kcalPer100g,
+                description: desc,
+                defaultQuId: defaultQu.id
+            )
+            // Link the barcode
+            try await client.linkBarcode(productId: productId, barcode: barcode)
+
+            // Re-fetch the full product from Grocy
+            let details = try await client.getProductDetails(id: productId)
+            HapticManager.shared.success()
+            withAnimation { importedProduct = details.product }
+            try? await Task.sleep(for: .seconds(1.2))
+            onImported(details.product)
+        } catch {
+            importError = "Import failed: \(error.localizedDescription)"
+            HapticManager.shared.error()
+        }
+        isImporting = false
+    }
+}
+
 // MARK: - NotFoundCard
 
 struct NotFoundCard: View {
     let barcode: String
-    let externalInfo: ExternalBarcodeLookup?
     let onDismiss: () -> Void
 
     var body: some View {
         VStack(spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(externalInfo?.name ?? "Product Not Found")
+                    Text("Product Not Found")
                         .font(.headline)
                     Text("Barcode: \(barcode)")
                         .font(.caption)
@@ -545,29 +758,13 @@ struct NotFoundCard: View {
                         .font(.title3)
                 }
             }
-
-            if let info = externalInfo {
-                if let group = info.productGroup {
-                    Label(group, systemImage: "tag.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Label(
-                    "Found via Open Food Facts — add this product in Grocy first.",
-                    systemImage: "info.circle"
-                )
-                .font(.caption)
-                .foregroundStyle(.orange)
-                .multilineTextAlignment(.leading)
-            } else {
-                Label(
-                    "This barcode isn't linked to any product. Add it in Grocy first.",
-                    systemImage: "barcode.viewfinder"
-                )
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            }
+            Label(
+                "This barcode isn't in Grocy or Open Food Facts. Add it manually in Grocy.",
+                systemImage: "barcode.viewfinder"
+            )
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
         }
         .padding(20)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))

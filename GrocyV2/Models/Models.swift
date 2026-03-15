@@ -425,6 +425,45 @@ struct ExternalBarcodeLookup: Codable {
     let calories: Double?
 }
 
+// MARK: - Open Food Facts
+
+struct OFFResponse: Codable {
+    let status: Int
+    let product: OFFProduct?
+}
+
+struct OFFProduct: Codable {
+    let productName: String?
+    let brands: String?
+    let quantity: String?
+    let nutriments: OFFNutriments?
+    let imageFrontUrl: String?
+
+    enum CodingKeys: String, CodingKey {
+        case productName = "product_name"
+        case brands
+        case quantity
+        case nutriments
+        case imageFrontUrl = "image_front_url"
+    }
+
+    var displayName: String {
+        productName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    var kcalPer100g: Double? {
+        nutriments?.energyKcal100g
+    }
+
+    struct OFFNutriments: Codable {
+        let energyKcal100g: Double?
+
+        enum CodingKeys: String, CodingKey {
+            case energyKcal100g = "energy-kcal_100g"
+        }
+    }
+}
+
 // MARK: - API Responses
 
 struct CreatedObjectResponse: Codable {

@@ -345,7 +345,66 @@ final class GrocyAPIClient {
         let encoded = barcode.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? barcode
         return try await perform(try request("/stock/barcodes/external-lookup/\(encoded)"))
     }
-    
+
+    // MARK: - Open Food Facts
+
+    /// Fetches product info from Open Food Facts (free, no auth required).
+    /// Returns nil if the barcode is not in the OFF database.
+    func fetchOpenFoodFacts(barcode: String) async throws -> OFFProduct? {
+        let fields = "product_name,brands,quantity,nutriments,image_front_url"
+        guard let url = URL(string: "https://world.openfoodfacts.org/api/v2/product/\(barcode).json?fields=\(fields)") else {
+            return nil
+        }
+        var req = URLRequest(url: url)
+        req.setValue("GrocyV2/1.0 (iOS)", forHTTPHeaderField: "User-Agent")
+        req.timeoutInterval = 10
+        let (data, _) = try await URLSession.shared.data(for: req)
+        let offDecoder = JSONDecoder()
+        // OFF uses camelCase field names except for nutriments which has custom keys
+        let response = try offDecoder.decode(OFFResponse.self, from: data)
+        guard response.status == 1, let product = response.product,
+              !product.displayName.isEmpty else { return nil }
+        return product
+    }
+
+    // MARK: - Product Creation
+
+    struct NewProductBody: Encodable {
+        let name: String
+        let quIdPurchase: Int
+        let quIdStock: Int
+        let quIdConsume: Int
+        let quIdPrice: Int
+        let calories: Double?
+        let description: String?
+    }
+
+    struct NewBarcodeBody: Encodable {
+        let productId: Int
+        let barcode: String
+    }
+
+    /// Creates a new product in Grocy, returns the new product id.
+    func createProduct(name: String, calories: Double?, description: String?, defaultQuId: Int) async throws -> Int {
+        let body = NewProductBody(
+            name: name,
+            quIdPurchase: defaultQuId,
+            quIdStock: defaultQuId,
+            quIdConsume: defaultQuId,
+            quIdPrice: defaultQuId,
+            calories: calories,
+            description: description
+        )
+        let result: CreatedObjectResponse = try await post("/objects/products", body: body)
+        return result.createdObjectId
+    }
+
+    /// Links a barcode string to an existing Grocy product.
+    func linkBarcode(productId: Int, barcode: String) async throws {
+        let body = NewBarcodeBody(productId: productId, barcode: barcode)
+        try await postVoid("/objects/product_barcodes", body: body)
+    }
+
     // MARK: - Files
     
     func productPictureURL(filename: String, height: Int = 200) -> URL? {
