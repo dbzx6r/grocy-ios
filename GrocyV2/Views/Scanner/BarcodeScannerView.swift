@@ -700,31 +700,36 @@ struct ImportProductCard: View {
         isImporting = true
         importError = nil
         do {
-            // Get quantity units to find a default QU id
-            let qus = try await client.getQuantityUnits()
+            async let qusTask = client.getQuantityUnits()
+            async let locsTask = client.getLocations()
+            let (qus, locs) = try await (qusTask, locsTask)
+
             guard let defaultQu = qus.first else {
                 importError = "No quantity units found. Set up quantity units in Grocy first."
                 isImporting = false
                 return
             }
-            // Build a description from brand + quantity
+            guard let defaultLoc = locs.first else {
+                importError = "No locations found. Set up at least one location in Grocy first."
+                isImporting = false
+                return
+            }
+
             let descParts = [
                 offProduct.brands?.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces),
                 offProduct.quantity
             ].compactMap { $0 }.filter { !$0.isEmpty }
             let desc: String? = descParts.isEmpty ? nil : descParts.joined(separator: " — ")
 
-            // Create product in Grocy
             let productId = try await client.createProduct(
                 name: name,
                 calories: offProduct.kcalPer100g,
                 description: desc,
-                defaultQuId: defaultQu.id
+                defaultQuId: defaultQu.id,
+                defaultLocationId: defaultLoc.id
             )
-            // Link the barcode
             try await client.linkBarcode(productId: productId, barcode: barcode)
 
-            // Re-fetch the full product from Grocy
             let details = try await client.getProductDetails(id: productId)
             HapticManager.shared.success()
             withAnimation { importedProduct = details.product }

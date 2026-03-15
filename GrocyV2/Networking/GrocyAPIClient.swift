@@ -393,6 +393,7 @@ final class GrocyAPIClient {
 
     struct NewProductBody: Encodable {
         let name: String
+        let locationId: Int
         let quIdPurchase: Int
         let quIdStock: Int
         let quIdConsume: Int
@@ -407,9 +408,10 @@ final class GrocyAPIClient {
     }
 
     /// Creates a new product in Grocy, returns the new product id.
-    func createProduct(name: String, calories: Double?, description: String?, defaultQuId: Int) async throws -> Int {
+    func createProduct(name: String, calories: Double?, description: String?, defaultQuId: Int, defaultLocationId: Int) async throws -> Int {
         let body = NewProductBody(
             name: name,
+            locationId: defaultLocationId,
             quIdPurchase: defaultQuId,
             quIdStock: defaultQuId,
             quIdConsume: defaultQuId,
