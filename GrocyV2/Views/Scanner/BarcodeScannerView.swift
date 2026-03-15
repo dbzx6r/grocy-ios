@@ -241,16 +241,14 @@ struct BarcodeScannerView: View {
         HapticManager.shared.impact(.medium)
         do {
             foundProduct = try await client.getProductByBarcode(barcode)
-        } catch NetworkError.notFound {
-            // Not in Grocy — try Open Food Facts first, then UPC Item DB as fallback
+        } catch {
+            // Grocy returns 400 (not 404) for unknown barcodes, plus any other
+            // error should still attempt external lookup.
             if let result = try? await client.fetchOpenFoodFacts(barcode: barcode) {
                 offProduct = result
             } else {
-                // UPC Item DB has better coverage for US grocery barcodes
                 offProduct = try? await client.fetchUPCItemDB(barcode: barcode)
             }
-            notFound = true
-        } catch {
             notFound = true
         }
         isSearching = false
@@ -371,8 +369,6 @@ struct DataScannerRepresentable: UIViewControllerRepresentable {
 // MARK: - ScannerOverlay
 
 struct ScannerOverlay: View {
-    @State private var scanLineOffset: CGFloat = -80
-
     var body: some View {
         GeometryReader { _ in
             ZStack {
@@ -391,22 +387,9 @@ struct ScannerOverlay: View {
 
                 // Viewfinder border
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.white.opacity(0.8), lineWidth: 2)
+                    .stroke(Color.white.opacity(0.6), lineWidth: 1.5)
                     .frame(width: 260, height: 160)
                     .overlay(viewfinderCorners)
-                    .overlay(
-                        Rectangle()
-                            .fill(Color.accentColor.opacity(0.8))
-                            .frame(height: 2)
-                            .offset(y: scanLineOffset)
-                            .clipShape(RoundedRectangle(cornerRadius: 1))
-                    )
-                    .clipped()
-            }
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                scanLineOffset = 80
             }
         }
     }
@@ -455,7 +438,7 @@ struct CornerAccent: View {
                 }
             }
             .stroke(
-                Color.accentColor,
+                Color.white,
                 style: StrokeStyle(lineWidth: thickness, lineCap: .round, lineJoin: .round)
             )
         }
