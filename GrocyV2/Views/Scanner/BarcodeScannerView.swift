@@ -5,6 +5,8 @@ import AVFoundation
 // MARK: - BarcodeScannerView
 
 struct BarcodeScannerView: View {
+    var onProductPicked: ((Product) -> Void)? = nil
+
     @Environment(AppViewModel.self) private var appVM
     @Environment(\.dismiss) private var dismiss
     @State private var scannedBarcode: String?
@@ -15,6 +17,7 @@ struct BarcodeScannerView: View {
     @State private var isPerformingAction = false
     @State private var externalLookup: ExternalBarcodeLookup?
     @State private var cameraPermission: AVAuthorizationStatus = .notDetermined
+    @State private var cameraReady = false
 
     var body: some View {
         ZStack {
@@ -43,7 +46,7 @@ struct BarcodeScannerView: View {
                             .background(Color.black.opacity(0.4), in: Circle())
                     }
                     Spacer()
-                    Text("Scan Barcode")
+                    Text(onProductPicked != nil ? "Scan to Select Product" : "Scan Barcode")
                         .font(.headline)
                         .foregroundStyle(.white)
                     Spacer()
@@ -51,6 +54,22 @@ struct BarcodeScannerView: View {
                 }
                 .padding()
                 Spacer()
+            }
+
+            // Camera warm-up overlay — hides auto-exposure burst
+            if !cameraReady {
+                Color.black
+                    .ignoresSafeArea()
+                    .overlay {
+                        VStack(spacing: 12) {
+                            ProgressView()
+                                .tint(.white)
+                            Text("Preparing camera…")
+                                .font(.subheadline)
+                                .foregroundStyle(.white.opacity(0.8))
+                        }
+                    }
+                    .transition(.opacity)
             }
 
             // Result panel
@@ -87,6 +106,7 @@ struct BarcodeScannerView: View {
             } else if let product = foundProduct {
                 ProductFoundCard(
                     product: product,
+                    onProductPicked: onProductPicked != nil ? { onProductPicked?(product.product); dismiss() } : nil,
                     onAdd: { await performAdd(product: product) },
                     onConsume: { await performConsume(product: product) },
                     onOpen: { await performOpen(product: product) },
@@ -170,6 +190,11 @@ struct BarcodeScannerView: View {
                     cameraPermission = granted ? .authorized : .denied
                 }
             }
+        }
+        // Fade out the warm-up overlay after camera has had time to calibrate exposure
+        Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            withAnimation(.easeOut(duration: 0.5)) { cameraReady = true }
         }
     }
 
@@ -258,7 +283,10 @@ struct DataScannerRepresentable: UIViewControllerRepresentable {
             isHighlightingEnabled: true
         )
         vc.delegate = context.coordinator
-        try? vc.startScanning()
+        // Delay scan start so camera AE stabilizes — prevents overexposed startup frames
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            try? vc.startScanning()
+        }
         return vc
     }
 
@@ -399,6 +427,7 @@ struct CornerAccent: View {
 
 struct ProductFoundCard: View {
     let product: ProductDetails
+    var onProductPicked: (() -> Void)? = nil
     let onAdd: () async -> Void
     let onConsume: () async -> Void
     let onOpen: () async -> Void
@@ -422,7 +451,7 @@ struct ProductFoundCard: View {
                         if let amount = product.stockAmount {
                             Text("·")
                                 .foregroundStyle(.tertiary)
-                            Text("\(amount, specifier: "%.0f") in stock")
+                            Text(String(format: "%.0f in stock", amount))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -436,7 +465,18 @@ struct ProductFoundCard: View {
                 }
             }
 
-            if let result = actionResult {
+            if let pickAction = onProductPicked {
+                // Picker mode: single "Use This Product" button
+                Button(action: pickAction) {
+                    Label("Use This Product", systemImage: "checkmark.circle.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.accentColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 14))
+                        .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
+            } else if let result = actionResult {
                 Text(result)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(result.contains("Error") ? .red : .green)

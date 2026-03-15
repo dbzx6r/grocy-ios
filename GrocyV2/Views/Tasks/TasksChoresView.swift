@@ -31,7 +31,7 @@ struct TasksChoresView: View {
                 }
             }
             .navigationTitle("Tasks & Chores")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {

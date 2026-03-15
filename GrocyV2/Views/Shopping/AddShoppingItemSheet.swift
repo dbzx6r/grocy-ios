@@ -11,6 +11,7 @@ struct AddShoppingItemSheet: View {
     @State private var isSubmitting = false
     @State private var didSucceed = false
     @State private var searchText = ""
+    @State private var showScanner = false
 
     private var filteredProducts: [Product] {
         searchText.isEmpty
@@ -21,7 +22,7 @@ struct AddShoppingItemSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Product") {
+                Section {
                     if let product = selectedProduct {
                         HStack {
                             Text(product.name)
@@ -31,7 +32,17 @@ struct AddShoppingItemSheet: View {
                                 .font(.caption)
                         }
                     } else {
-                        TextField("Search products...", text: $searchText)
+                        HStack {
+                            TextField("Search products...", text: $searchText)
+                            Button {
+                                showScanner = true
+                            } label: {
+                                Image(systemName: "barcode.viewfinder")
+                                    .foregroundStyle(Color.accentColor)
+                                    .font(.title3)
+                            }
+                            .buttonStyle(.plain)
+                        }
                         if !searchText.isEmpty {
                             ForEach(filteredProducts.prefix(8)) { product in
                                 Button {
@@ -44,6 +55,13 @@ struct AddShoppingItemSheet: View {
                                 }
                             }
                         }
+                    }
+                } header: {
+                    Text("Product")
+                } footer: {
+                    if selectedProduct == nil {
+                        Text("Type to search, or tap \(Image(systemName: "barcode.viewfinder")) to scan a barcode.")
+                            .font(.caption)
                     }
                 }
 
@@ -76,6 +94,13 @@ struct AddShoppingItemSheet: View {
                     }
                     .disabled(isSubmitting || (selectedProduct == nil && note.isEmpty))
                 }
+            }
+            .sheet(isPresented: $showScanner) {
+                BarcodeScannerView(onProductPicked: { product in
+                    selectedProduct = product
+                    HapticManager.shared.success()
+                })
+                .environment(appVM)
             }
         }
     }
