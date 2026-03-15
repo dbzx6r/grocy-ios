@@ -2,13 +2,20 @@ import SwiftUI
 
 struct LowStockCard: View {
     let missing: [MissingProduct]
+    let onNavigate: (() -> Void)?
+
+    init(missing: [MissingProduct], onNavigate: (() -> Void)? = nil) {
+        self.missing = missing
+        self.onNavigate = onNavigate
+    }
 
     var body: some View {
         GrocyCard(
             title: "Low / Out of Stock",
             systemImage: "cart.badge.minus",
             accentColor: .red,
-            count: missing.count
+            count: missing.count,
+            action: onNavigate
         ) {
             if missing.isEmpty {
                 Text("All products are stocked")

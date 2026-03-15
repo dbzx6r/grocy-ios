@@ -6,6 +6,7 @@ import Observation
 final class AppViewModel {
     var isOnboarded: Bool = false
     var isDemoMode: Bool = false
+    var selectedTab: Int = 0
     var serverURL: String = ""
     var apiKey: String = ""
     var client: GrocyAPIClient?

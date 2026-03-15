@@ -3,13 +3,21 @@ import SwiftUI
 struct OverdueCard: View {
     let tasks: [GrocyTask]
     let chores: [ChoreDetails]
+    let onNavigate: (() -> Void)?
+
+    init(tasks: [GrocyTask], chores: [ChoreDetails], onNavigate: (() -> Void)? = nil) {
+        self.tasks = tasks
+        self.chores = chores
+        self.onNavigate = onNavigate
+    }
 
     var body: some View {
         GrocyCard(
             title: "Overdue",
             systemImage: "clock.badge.exclamationmark.fill",
             accentColor: .purple,
-            count: tasks.count + chores.count
+            count: tasks.count + chores.count,
+            action: onNavigate
         ) {
             VStack(spacing: 6) {
                 ForEach(tasks.prefix(3)) { task in
@@ -33,7 +41,7 @@ struct OverdueCard: View {
                         Image(systemName: "arrow.2.circlepath")
                             .foregroundStyle(.blue)
                             .font(.caption)
-                        Text(detail.chore.name)
+                        Text(detail.name)
                             .font(.subheadline)
                             .lineLimit(1)
                         Spacer()

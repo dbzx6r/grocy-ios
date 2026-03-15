@@ -72,4 +72,13 @@ final class RecipesViewModel {
             self.error = error.localizedDescription
         }
     }
+
+    func createRecipe(client: GrocyAPIClient, name: String, description: String?, baseServings: Double) async {
+        do {
+            _ = try await client.createRecipe(name: name, description: description, baseServings: baseServings)
+            await load(client: client)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
 }

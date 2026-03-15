@@ -14,6 +14,7 @@
 		18FBB7BD65E67C51BB7081C8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DC362C4EED5895A0AB1B29B3 /* Assets.xcassets */; };
 		194F745497831016FAF754C0 /* AddShoppingItemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5009A6FB7155C92B4D2A3F0D /* AddShoppingItemSheet.swift */; };
 		1EC9844F716B6E6999C1FA78 /* AnimatedCheckmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = D992D2B7EE7F593FDDC3EEC7 /* AnimatedCheckmark.swift */; };
+		20AADF01F71F501392C9593F /* KrogerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05EFE3DD9832951AFC221BAF /* KrogerService.swift */; };
 		2CB17752B2E6F3DB64D24A59 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42F0D3E1ADFD9FD26533FF7B /* Models.swift */; };
 		2DCB54E702E0FD5F0963DFEF /* RecipesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87E5877DDDA6A47F6B86CAD1 /* RecipesView.swift */; };
 		30E58CBBEA84433837DC6644 /* ConsumeStockSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEC671F528F5D14093CD1C94 /* ConsumeStockSheet.swift */; };
@@ -21,6 +22,7 @@
 		3F7D18EC57C4E108791A6BC3 /* ExpiryBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 426C8CAF123F5BF2297507F2 /* ExpiryBadge.swift */; };
 		421CBFC33BE7E2DC755A6909 /* ShoppingItemRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17002CB0E23F178580DD8608 /* ShoppingItemRow.swift */; };
 		42C26F2A40A02BB56612C527 /* TaskRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB05E0E68D004ED09547DA10 /* TaskRow.swift */; };
+		4924C000FA87E30E6B5E75D4 /* AddEditChoreSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85E9BB994EDDFCD90D28B16D /* AddEditChoreSheet.swift */; };
 		4ABFC85047D78415BC664C84 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5004708C5C7B25CED7631E93 /* SettingsView.swift */; };
 		584B4825C371C6711AF826B8 /* GrocyV2App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F7679B4A2A5EF7AC933E00C /* GrocyV2App.swift */; };
 		5B0B6BEFF329C0F04CE89E68 /* GrocyCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EFD58BD735E58B0C36E321E /* GrocyCard.swift */; };
@@ -30,11 +32,13 @@
 		7CFFAD6AC7B12BD6361D122A /* AddStockSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EEC7A01FB74D436B138784B /* AddStockSheet.swift */; };
 		84A8756FED5F049022F3DAFE /* LoadingShimmer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73770D0BD4283877D95CB6A9 /* LoadingShimmer.swift */; };
 		8CB1FE02D710157E7E7B8B7C /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5972D0A98594F6373A5F5A4 /* KeychainHelper.swift */; };
+		8D552777BF33ED8B52C31339 /* AddEditTaskSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1458AEE9FF22F468641E0298 /* AddEditTaskSheet.swift */; };
 		8FDE590166D10AE31BF0CC0D /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DF8FA8A781FFF1103787FAE /* DashboardViewModel.swift */; };
 		928EB84CFCB11A8A7BF795BE /* OnboardingFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16281EAB4C83969C852814C8 /* OnboardingFlow.swift */; };
 		94EB2C1A0BBF483F640F4FB2 /* BarcodeScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F702D5E255C1856FFBCDA64 /* BarcodeScannerView.swift */; };
 		9C3134CDE084F6413D4E759E /* ExpiringItemsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E696D9C2E42F1E99AD9133 /* ExpiringItemsCard.swift */; };
 		9F853B97C74D8ECC0B753CAF /* LowStockCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7656E316D2F521BCEE3A3402 /* LowStockCard.swift */; };
+		A21027EEF4D7F40AEE3B5712 /* KrogerSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCF0EDC1835D746BD9297268 /* KrogerSetupView.swift */; };
 		A267E999596AAA39761D6E72 /* DateFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = A193A0715B010708306780EF /* DateFormatters.swift */; };
 		ACB63EEAD65FB1AF1A176EE1 /* ChoreRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D4EA913E38C6C23E737E8A /* ChoreRow.swift */; };
 		AD77068F7D1E7896D782CEE5 /* ServerSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17283EE05BA970DBBA6CFDC /* ServerSetupView.swift */; };
@@ -44,6 +48,7 @@
 		C91E2664F924A225372621EC /* DemoIntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF3DA38FA9FBDF6FE33B6028 /* DemoIntroView.swift */; };
 		CC78C975B8BE4FC4FF1BEBDD /* NetworkError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A42622C0551DB6A0476E972 /* NetworkError.swift */; };
 		CC8B493593D3D3DB3A06F7AB /* OverdueCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96902207EAACBB92D5874D92 /* OverdueCard.swift */; };
+		DA2DC0A87CEEA2FA047B40CE /* PutAwayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 833BB99DDC7C90E757A71CD7 /* PutAwayView.swift */; };
 		DCBE80D63CB25774AFDB5919 /* RecipeDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBDEBD9A4309657C58A3D58B /* RecipeDetailView.swift */; };
 		E7330FA56D6320DF39195CDC /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0486B392152473ED5154603 /* ContentView.swift */; };
 		E8C6AE463697EFC9218F0BE2 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4F197992660B0FBC3891B10 /* WelcomeView.swift */; };
@@ -53,7 +58,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		05EFE3DD9832951AFC221BAF /* KrogerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KrogerService.swift; sourceTree = "<group>"; };
 		12B4122782C9292E3B667245 /* ShoppingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShoppingViewModel.swift; sourceTree = "<group>"; };
+		1458AEE9FF22F468641E0298 /* AddEditTaskSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddEditTaskSheet.swift; sourceTree = "<group>"; };
 		14DE4389A763BA09B2403EE1 /* HapticManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticManager.swift; sourceTree = "<group>"; };
 		16281EAB4C83969C852814C8 /* OnboardingFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlow.swift; sourceTree = "<group>"; };
 		17002CB0E23F178580DD8608 /* ShoppingItemRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShoppingItemRow.swift; sourceTree = "<group>"; };
@@ -76,6 +83,8 @@
 		7A42622C0551DB6A0476E972 /* NetworkError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkError.swift; sourceTree = "<group>"; };
 		81B05C78F324797F3A185E39 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		81F171E3AB0F93891EE9695A /* ProductDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductDetailView.swift; sourceTree = "<group>"; };
+		833BB99DDC7C90E757A71CD7 /* PutAwayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PutAwayView.swift; sourceTree = "<group>"; };
+		85E9BB994EDDFCD90D28B16D /* AddEditChoreSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddEditChoreSheet.swift; sourceTree = "<group>"; };
 		87E5877DDDA6A47F6B86CAD1 /* RecipesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipesView.swift; sourceTree = "<group>"; };
 		9026EF8345780A696C90D668 /* StockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StockView.swift; sourceTree = "<group>"; };
 		9450E4527248B428E798B355 /* ConfettiBurst.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfettiBurst.swift; sourceTree = "<group>"; };
@@ -95,6 +104,7 @@
 		D992D2B7EE7F593FDDC3EEC7 /* AnimatedCheckmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedCheckmark.swift; sourceTree = "<group>"; };
 		DA95E34BEF5157E83FC26232 /* RecipesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipesViewModel.swift; sourceTree = "<group>"; };
 		DC362C4EED5895A0AB1B29B3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		DCF0EDC1835D746BD9297268 /* KrogerSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KrogerSetupView.swift; sourceTree = "<group>"; };
 		E7E5CB10CE2BB64815B2B7DE /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		EBDEBD9A4309657C58A3D58B /* RecipeDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeDetailView.swift; sourceTree = "<group>"; };
 		EEC671F528F5D14093CD1C94 /* ConsumeStockSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsumeStockSheet.swift; sourceTree = "<group>"; };
@@ -174,6 +184,7 @@
 			isa = PBXGroup;
 			children = (
 				5009A6FB7155C92B4D2A3F0D /* AddShoppingItemSheet.swift */,
+				833BB99DDC7C90E757A71CD7 /* PutAwayView.swift */,
 				17002CB0E23F178580DD8608 /* ShoppingItemRow.swift */,
 				9F0A3E42B61B3DB943B4BDD9 /* ShoppingView.swift */,
 			);
@@ -205,6 +216,14 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
+		91C349DDC275CD8034D30BFA /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				DCF0EDC1835D746BD9297268 /* KrogerSetupView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
 		A20DF0E8A110C43145846D4C /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -221,6 +240,7 @@
 				8B4CFDC5AFB6088AC97EBB9C /* Models */,
 				7DEC2252FA2C36F9D1462216 /* Networking */,
 				BA7712CA76A41505BE864C7E /* Resources */,
+				C98404C03F26EBAD761D90CF /* Services */,
 				DE4AAFEEC32415BD4D7C3ED3 /* Storage */,
 				BD1F7CB4321E904AE9CA5206 /* Utilities */,
 				D13FC3C1C2DD48A579CF3F78 /* ViewModels */,
@@ -232,6 +252,8 @@
 		A719B6EDA2FF21D42C75A7FB /* Tasks */ = {
 			isa = PBXGroup;
 			children = (
+				85E9BB994EDDFCD90D28B16D /* AddEditChoreSheet.swift */,
+				1458AEE9FF22F468641E0298 /* AddEditTaskSheet.swift */,
 				B0D4EA913E38C6C23E737E8A /* ChoreRow.swift */,
 				CB05E0E68D004ED09547DA10 /* TaskRow.swift */,
 				22A0645681844051F1B7FCE0 /* TasksChoresView.swift */,
@@ -265,6 +287,14 @@
 			path = Utilities;
 			sourceTree = "<group>";
 		};
+		C98404C03F26EBAD761D90CF /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				05EFE3DD9832951AFC221BAF /* KrogerService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
 		D13FC3C1C2DD48A579CF3F78 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
@@ -294,6 +324,7 @@
 				44AC63222C72AB128B89E436 /* Onboarding */,
 				16CE4B8629B64A778BFEBB95 /* Recipes */,
 				74F191BDF423FE47E85BEFC1 /* Scanner */,
+				91C349DDC275CD8034D30BFA /* Settings */,
 				57E57C261D13754E5554F5B4 /* Shopping */,
 				29585AE7F4670F4C0D003E6B /* Stock */,
 				A719B6EDA2FF21D42C75A7FB /* Tasks */,
@@ -372,6 +403,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4924C000FA87E30E6B5E75D4 /* AddEditChoreSheet.swift in Sources */,
+				8D552777BF33ED8B52C31339 /* AddEditTaskSheet.swift in Sources */,
 				194F745497831016FAF754C0 /* AddShoppingItemSheet.swift in Sources */,
 				7CFFAD6AC7B12BD6361D122A /* AddStockSheet.swift in Sources */,
 				1EC9844F716B6E6999C1FA78 /* AnimatedCheckmark.swift in Sources */,
@@ -393,6 +426,8 @@
 				584B4825C371C6711AF826B8 /* GrocyV2App.swift in Sources */,
 				675181ABAE511D749D7B89D0 /* HapticManager.swift in Sources */,
 				8CB1FE02D710157E7E7B8B7C /* KeychainHelper.swift in Sources */,
+				20AADF01F71F501392C9593F /* KrogerService.swift in Sources */,
+				A21027EEF4D7F40AEE3B5712 /* KrogerSetupView.swift in Sources */,
 				84A8756FED5F049022F3DAFE /* LoadingShimmer.swift in Sources */,
 				9F853B97C74D8ECC0B753CAF /* LowStockCard.swift in Sources */,
 				2CB17752B2E6F3DB64D24A59 /* Models.swift in Sources */,
@@ -400,6 +435,7 @@
 				928EB84CFCB11A8A7BF795BE /* OnboardingFlow.swift in Sources */,
 				CC8B493593D3D3DB3A06F7AB /* OverdueCard.swift in Sources */,
 				C34D56EA67D0E1937DA155F6 /* ProductDetailView.swift in Sources */,
+				DA2DC0A87CEEA2FA047B40CE /* PutAwayView.swift in Sources */,
 				DCBE80D63CB25774AFDB5919 /* RecipeDetailView.swift in Sources */,
 				2DCB54E702E0FD5F0963DFEF /* RecipesView.swift in Sources */,
 				BEB8D0B7188EBE75C973CD1D /* RecipesViewModel.swift in Sources */,

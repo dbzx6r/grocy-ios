@@ -4,33 +4,57 @@ struct ExpiringItemsCard: View {
     let expiringSoon: [StockItem]
     let overdue: [StockItem]
     let expired: [StockItem]
+    let onNavigate: (() -> Void)?
 
-    private var allItems: [StockItem] {
-        (expired + overdue + expiringSoon).prefix(5).map { $0 }
+    init(expiringSoon: [StockItem], overdue: [StockItem], expired: [StockItem], onNavigate: (() -> Void)? = nil) {
+        self.expiringSoon = expiringSoon
+        self.overdue = overdue
+        self.expired = expired
+        self.onNavigate = onNavigate
     }
 
-    private var totalCount: Int { expired.count + overdue.count + expiringSoon.count }
+    @State private var isExpanded = false
+
+    private var sortedItems: [StockItem] { expired + overdue + expiringSoon }
+    private var visibleItems: [StockItem] {
+        isExpanded ? sortedItems : Array(sortedItems.prefix(5))
+    }
+    private var totalCount: Int { sortedItems.count }
+    private var hiddenCount: Int { max(0, totalCount - 5) }
 
     var body: some View {
         GrocyCard(
             title: "Expiring Items",
             systemImage: "calendar.badge.exclamationmark",
             accentColor: .orange,
-            count: totalCount
+            count: totalCount,
+            action: onNavigate
         ) {
-            if allItems.isEmpty {
+            if sortedItems.isEmpty {
                 Text("Nothing expiring soon")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
                 VStack(spacing: 8) {
-                    ForEach(allItems) { item in
+                    ForEach(visibleItems) { item in
                         ExpiringItemRow(item: item)
                     }
-                    if totalCount > 5 {
-                        Text("+ \(totalCount - 5) more")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    if hiddenCount > 0 || isExpanded {
+                        Button {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                isExpanded.toggle()
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(isExpanded ? "Show less" : "+ \(hiddenCount) more")
+                                    .font(.caption.weight(.medium))
+                                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                                    .font(.caption2.weight(.semibold))
+                            }
+                            .foregroundStyle(.orange)
+                            .padding(.top, 2)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }

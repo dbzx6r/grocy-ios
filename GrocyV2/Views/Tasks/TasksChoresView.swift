@@ -33,17 +33,43 @@ struct TasksChoresView: View {
             .navigationTitle("Tasks & Chores")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if vm.selectedTab == .tasks {
+                        Button {
+                            withAnimation { vm.showCompleted.toggle() }
+                        } label: {
+                            Image(systemName: vm.showCompleted ? "eye.slash" : "eye")
+                        }
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
-                        withAnimation { vm.showCompleted.toggle() }
+                        switch vm.selectedTab {
+                        case .tasks:
+                            vm.editingTask = nil
+                            vm.showAddEditTask = true
+                        case .chores:
+                            vm.editingChoreId = nil
+                            vm.showAddEditChore = true
+                        }
                     } label: {
-                        Image(systemName: vm.showCompleted ? "eye.slash" : "eye")
+                        Image(systemName: "plus")
                     }
                 }
             }
             .refreshable {
                 guard let client = appVM.client else { return }
                 await vm.load(client: client)
+            }
+            .sheet(isPresented: Bindable(vm).showAddEditTask) {
+                AddEditTaskSheet(existingTask: vm.editingTask)
+                    .environment(vm)
+                    .environment(appVM)
+            }
+            .sheet(isPresented: Bindable(vm).showAddEditChore) {
+                AddEditChoreSheet(choreId: vm.editingChoreId)
+                    .environment(vm)
+                    .environment(appVM)
             }
         }
         .overlay {
@@ -95,6 +121,19 @@ struct TasksChoresView: View {
                                 .tint(.green)
                             }
                             .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) {
+                                    guard let client = appVM.client else { return }
+                                    Task { await vm.deleteTask(client: client, id: task.id) }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                Button {
+                                    vm.editingTask = task
+                                    vm.showAddEditTask = true
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                .tint(.orange)
                                 if task.isDone {
                                     Button {
                                         guard let client = appVM.client else { return }
@@ -102,7 +141,7 @@ struct TasksChoresView: View {
                                     } label: {
                                         Label("Undo", systemImage: "arrow.uturn.backward")
                                     }
-                                    .tint(.orange)
+                                    .tint(.blue)
                                 }
                             }
                         }
@@ -120,7 +159,7 @@ struct TasksChoresView: View {
             EmptyStateView(
                 systemImage: "arrow.2.circlepath.circle",
                 title: "No Chores",
-                subtitle: "Create chores in your Grocy server."
+                subtitle: "Tap + to add your first chore."
             )
         } else {
             List {
@@ -128,7 +167,7 @@ struct TasksChoresView: View {
                     ChoreRow(detail: detail) {
                         guard let client = appVM.client else { return }
                         Task {
-                            await vm.executeChore(client: client, id: detail.chore.id)
+                            await vm.executeChore(client: client, id: detail.id)
                             HapticManager.shared.success()
                             withAnimation { showConfetti = true }
                             Task {
@@ -140,11 +179,26 @@ struct TasksChoresView: View {
                     .swipeActions(edge: .leading, allowsFullSwipe: true) {
                         Button {
                             guard let client = appVM.client else { return }
-                            Task { await vm.executeChore(client: client, id: detail.chore.id) }
+                            Task { await vm.executeChore(client: client, id: detail.id) }
                         } label: {
                             Label("Done", systemImage: "checkmark.circle.fill")
                         }
                         .tint(.green)
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            guard let client = appVM.client else { return }
+                            Task { await vm.deleteChore(client: client, id: detail.id) }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                        Button {
+                            vm.editingChoreId = detail.choreId
+                            vm.showAddEditChore = true
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        .tint(.orange)
                     }
                 }
             }

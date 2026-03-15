@@ -37,19 +37,30 @@ final class DashboardViewModel {
     func load(client: GrocyAPIClient) async {
         isLoading = true
         error = nil
-        do {
-            async let volatile = client.getVolatileStock(dueSoonDays: 7)
-            async let tasksResult = client.getTasks()
-            async let choresResult = client.getChores()
-            volatileStock = try await volatile
-            tasks = try await tasksResult
-            chores = try await choresResult
-            overdueTasksCount = tasks.filter { $0.isOverdue }.count
-            overdueChoresCount = chores.filter { $0.isOverdue }.count
-            lastRefresh = .now
-        } catch {
-            self.error = error.localizedDescription
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask {
+                if let v = try? await client.getVolatileStock(dueSoonDays: 30) {
+                    await MainActor.run { self.volatileStock = v }
+                }
+            }
+            group.addTask {
+                if let t = try? await client.getTasks() {
+                    await MainActor.run {
+                        self.tasks = t
+                        self.overdueTasksCount = t.filter { $0.isOverdue }.count
+                    }
+                }
+            }
+            group.addTask {
+                if let c = try? await client.getChores() {
+                    await MainActor.run {
+                        self.chores = c
+                        self.overdueChoresCount = c.filter { $0.isOverdue }.count
+                    }
+                }
+            }
         }
+        lastRefresh = .now
         isLoading = false
     }
 

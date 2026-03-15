@@ -4,6 +4,10 @@ struct RecipesView: View {
     @Environment(RecipesViewModel.self) private var vm
     @Environment(AppViewModel.self) private var appVM
 
+    @State private var showCreateRecipe = false
+    @State private var showAddMealPlan = false
+    @State private var addMealPlanDay: String = ""
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -29,9 +33,32 @@ struct RecipesView: View {
             }
             .navigationTitle("Recipes")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    if vm.selectedTab == .recipes {
+                        Button {
+                            showCreateRecipe = true
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                    }
+                }
+            }
             .refreshable {
                 guard let client = appVM.client else { return }
                 await vm.load(client: client)
+            }
+            .sheet(isPresented: $showCreateRecipe) {
+                CreateRecipeSheet { name, description, servings in
+                    guard let client = appVM.client else { return }
+                    await vm.createRecipe(client: client, name: name, description: description, baseServings: servings)
+                }
+            }
+            .sheet(isPresented: $showAddMealPlan) {
+                AddMealPlanSheet(day: addMealPlanDay, recipes: vm.recipes) { recipeId, servings in
+                    guard let client = appVM.client else { return }
+                    await vm.addToMealPlan(client: client, day: addMealPlanDay, recipeId: recipeId, servings: servings)
+                }
             }
         }
         .task {
@@ -46,7 +73,7 @@ struct RecipesView: View {
             EmptyStateView(
                 systemImage: "fork.knife",
                 title: "No Recipes",
-                subtitle: "Add recipes in your Grocy server."
+                subtitle: "Tap + to create your first recipe."
             )
         } else {
             ScrollView {
@@ -106,7 +133,11 @@ struct RecipesView: View {
                         MealPlanDayCard(
                             day: day,
                             items: vm.mealPlanItems(for: day),
-                            recipes: vm.recipes
+                            recipes: vm.recipes,
+                            onAdd: {
+                                addMealPlanDay = day
+                                showAddMealPlan = true
+                            }
                         ) { id in
                             guard let client = appVM.client else { return }
                             await vm.removeFromMealPlan(client: client, id: id)
@@ -184,6 +215,7 @@ struct MealPlanDayCard: View {
     let day: String
     let items: [MealPlanItem]
     let recipes: [Recipe]
+    let onAdd: () -> Void
     let onRemove: (Int) async -> Void
 
     private var displayDate: String {
@@ -230,6 +262,14 @@ struct MealPlanDayCard: View {
                     .background(Color.accentColor, in: Capsule())
             }
             Spacer()
+            Button {
+                onAdd()
+            } label: {
+                Image(systemName: "plus.circle")
+                    .foregroundStyle(Color.accentColor)
+                    .font(.body)
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -275,6 +315,148 @@ struct MealPlanItemRow: View {
                     .foregroundStyle(.red)
             }
             .buttonStyle(.plain)
+        }
+    }
+}
+
+// MARK: - CreateRecipeSheet
+
+struct CreateRecipeSheet: View {
+    let onSave: (String, String?, Double) async -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var name = ""
+    @State private var description = ""
+    @State private var baseServings: Double = 2
+    @State private var isSaving = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Recipe Details") {
+                    TextField("Name", text: $name)
+                    TextField("Description (optional)", text: $description, axis: .vertical)
+                        .lineLimit(3...6)
+                }
+                Section("Servings") {
+                    Stepper(value: $baseServings, in: 1...100, step: 1) {
+                        HStack {
+                            Text("Base Servings")
+                            Spacer()
+                            Text("\(Int(baseServings))")
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("New Recipe")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isSaving {
+                        ProgressView()
+                    } else {
+                        Button("Save") {
+                            isSaving = true
+                            Task {
+                                await onSave(name, description.isEmpty ? nil : description, baseServings)
+                                dismiss()
+                            }
+                        }
+                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .fontWeight(.semibold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - AddMealPlanSheet
+
+struct AddMealPlanSheet: View {
+    let day: String
+    let recipes: [Recipe]
+    let onSave: (Int, Double) async -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var selectedRecipeId: Int?
+    @State private var servings: Double = 1
+    @State private var isSaving = false
+
+    private var displayDate: String {
+        guard let date = DateFormatters.shared.apiDate.date(from: day) else { return day }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMMM d"
+        return formatter.string(from: date)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Day") {
+                    Text(displayDate)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Recipe") {
+                    if recipes.isEmpty {
+                        Text("No recipes available. Create one in the Recipes tab.")
+                            .foregroundStyle(.secondary)
+                            .font(.subheadline)
+                    } else {
+                        Picker("Select Recipe", selection: $selectedRecipeId) {
+                            Text("Choose…").tag(Int?.none)
+                            ForEach(recipes) { recipe in
+                                Text(recipe.name).tag(Int?.some(recipe.id))
+                            }
+                        }
+                        .pickerStyle(.navigationLink)
+                    }
+                }
+
+                Section("Servings") {
+                    Stepper(value: $servings, in: 0.5...100, step: 0.5) {
+                        HStack {
+                            Text("Servings")
+                            Spacer()
+                            Text(servings.formatted(.number.precision(.fractionLength(0...1))))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Add to Meal Plan")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isSaving {
+                        ProgressView()
+                    } else {
+                        Button("Add") {
+                            guard let recipeId = selectedRecipeId else { return }
+                            isSaving = true
+                            Task {
+                                await onSave(recipeId, servings)
+                                dismiss()
+                            }
+                        }
+                        .disabled(selectedRecipeId == nil)
+                        .fontWeight(.semibold)
+                    }
+                }
+            }
+            .onAppear {
+                selectedRecipeId = recipes.first?.id
+            }
         }
     }
 }

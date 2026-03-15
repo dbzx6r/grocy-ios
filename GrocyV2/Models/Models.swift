@@ -165,6 +165,13 @@ struct VolatileStock: Codable {
     let overdue: [StockItem]
     let expired: [StockItem]
     let missing: [MissingProduct]
+
+    enum CodingKeys: String, CodingKey {
+        case dueSoon = "dueProducts"
+        case overdue = "overdueProducts"
+        case expired = "expiredProducts"
+        case missing = "missingProducts"
+    }
 }
 
 struct MissingProduct: Codable, Identifiable {
@@ -230,6 +237,27 @@ struct ProductGroup: Codable, Identifiable {
 }
 
 // MARK: - Shopping List
+
+/// A pending stock-add entry assembled in PutAwayView before committing to stock.
+struct PutAwayEntry: Identifiable {
+    let id: Int          // shopping list item id
+    let productId: Int
+    let productName: String
+    var barcode: String?  // first UPC/EAN barcode from Grocy, used for Kroger lookup
+    var amount: Double
+    var hasExpiry: Bool
+    var expiryDate: Date
+    var price: String     // free-form string; converted to Double? on submit
+
+    var bestBeforeDateString: String {
+        hasExpiry ? DateFormatters.shared.apiDate.string(from: expiryDate) : "2099-12-31"
+    }
+
+    var priceDouble: Double? {
+        guard !price.isEmpty else { return nil }
+        return Double(price.replacingOccurrences(of: ",", with: "."))
+    }
+}
 
 struct ShoppingList: Codable, Identifiable {
     let id: Int
@@ -311,18 +339,26 @@ struct Chore: Codable, Identifiable {
 }
 
 struct ChoreDetails: Codable, Identifiable {
-    var id: Int { chore.id }
-    let chore: Chore
-    let lastTracked: String?
+    let id: Int
+    let choreId: Int
+    let choreName: String
+    let lastTrackedTime: String?
     let nextEstimatedExecutionTime: String?
-    let trackCount: Int?
+    let trackDateOnly: BoolOrInt?
+    let nextExecutionAssignedToUserId: Int?
+    let isRescheduled: BoolOrInt?
+    let isReassigned: BoolOrInt?
     let nextExecutionAssignedUser: GrocyUser?
-    
+
+    // Convenience aliases used by views
+    var name: String { choreName }
+    var description: String? { nil }
+
     var nextDueDate: Date? {
         guard let s = nextEstimatedExecutionTime else { return nil }
         return DateFormatters.shared.apiDateTime.date(from: s)
     }
-    
+
     var isOverdue: Bool {
         guard let d = nextDueDate else { return false }
         return d < .now

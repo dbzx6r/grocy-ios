@@ -7,12 +7,13 @@ final class GrocyAPIClient {
     private let baseURL: String
     private let apiKey: String
     
-    private var urlSession: URLSession {
+    private let urlSession: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 60
+        config.waitsForConnectivity = true
         return URLSession(configuration: config)
-    }
+    }()
     
     private let decoder: JSONDecoder = {
         let d = JSONDecoder()
@@ -190,13 +191,30 @@ final class GrocyAPIClient {
     func getShoppingLists() async throws -> [ShoppingList] {
         try await perform(try request("/objects/shopping_lists"))
     }
-    
-    func getShoppingListItems(listId: Int? = nil) async throws -> [ShoppingListItem] {
-        let path = listId.map { "/objects/shopping_list?query[]=shopping_list_id%3D\($0)" } ?? "/objects/shopping_list"
-        return try await perform(try request(path))
+
+    func createShoppingList(name: String) async throws {
+        struct Body: Encodable { let name: String }
+        try await postVoid("/objects/shopping_lists", body: Body(name: name))
+    }
+
+    func deleteShoppingList(id: Int) async throws {
+        let req = try request("/objects/shopping_lists/\(id)", method: "DELETE")
+        try await performVoid(req)
     }
     
-    func addShoppingListItem(productId: Int?, note: String?, amount: Double = 1, shoppingListId: Int = 1, quId: Int? = nil) async throws -> CreatedObjectResponse {
+    func getShoppingListItems(listId: Int? = nil) async throws -> [ShoppingListItem] {
+        var comps = URLComponents(string: "\(baseURL)/api/objects/shopping_list")!
+        if let listId {
+            comps.queryItems = [URLQueryItem(name: "query[]", value: "shopping_list_id=\(listId)")]
+        }
+        guard let url = comps.url else { throw NetworkError.invalidURL }
+        var req = URLRequest(url: url)
+        req.setValue(apiKey, forHTTPHeaderField: "GROCY-API-KEY")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        return try await perform(req)
+    }
+    
+    func addShoppingListItem(productId: Int?, note: String?, amount: Double = 1, shoppingListId: Int = 1, quId: Int? = nil) async throws {
         struct Body: Encodable {
             let productId: Int?
             let note: String?
@@ -204,7 +222,7 @@ final class GrocyAPIClient {
             let shoppingListId: Int
             let quId: Int?
         }
-        return try await post("/objects/shopping_list", body: Body(productId: productId, note: note, amount: amount, shoppingListId: shoppingListId, quId: quId))
+        try await postVoid("/objects/shopping_list", body: Body(productId: productId, note: note, amount: amount, shoppingListId: shoppingListId, quId: quId))
     }
     
     func updateShoppingListItem(id: Int, done: Bool) async throws {
@@ -260,6 +278,35 @@ final class GrocyAPIClient {
         let req = try request("/tasks/\(id)/undo", method: "POST")
         try await performVoid(req)
     }
+
+    func createTask(name: String, description: String?, dueDate: String?, categoryId: Int?) async throws {
+        struct Body: Encodable {
+            let name: String
+            let description: String?
+            let dueDate: String?
+            let categoryId: Int?
+        }
+        let data = try encoder.encode(Body(name: name, description: description, dueDate: dueDate, categoryId: categoryId))
+        let req = try request("/objects/tasks", method: "POST", body: data)
+        try await performVoid(req)
+    }
+
+    func updateTask(id: Int, name: String, description: String?, dueDate: String?, categoryId: Int?) async throws {
+        struct Body: Encodable {
+            let name: String
+            let description: String?
+            let dueDate: String?
+            let categoryId: Int?
+        }
+        let data = try encoder.encode(Body(name: name, description: description, dueDate: dueDate, categoryId: categoryId))
+        let req = try request("/objects/tasks/\(id)", method: "PUT", body: data)
+        try await performVoid(req)
+    }
+
+    func deleteTask(id: Int) async throws {
+        let req = try request("/objects/tasks/\(id)", method: "DELETE")
+        try await performVoid(req)
+    }
     
     // MARK: - Chores
     
@@ -277,6 +324,41 @@ final class GrocyAPIClient {
         let req = try request("/chores/\(id)/execute", method: "POST", body: data)
         try await performVoid(req)
     }
+
+    func createChore(name: String, description: String?, periodType: String, periodInterval: Int) async throws {
+        struct Body: Encodable {
+            let name: String
+            let description: String?
+            let periodType: String
+            let periodInterval: Int
+            let periodDays: Int
+        }
+        let data = try encoder.encode(Body(name: name, description: description, periodType: periodType, periodInterval: periodInterval, periodDays: periodInterval))
+        let req = try request("/objects/chores", method: "POST", body: data)
+        try await performVoid(req)
+    }
+
+    func updateChore(id: Int, name: String, description: String?, periodType: String, periodInterval: Int) async throws {
+        struct Body: Encodable {
+            let name: String
+            let description: String?
+            let periodType: String
+            let periodInterval: Int
+            let periodDays: Int
+        }
+        let data = try encoder.encode(Body(name: name, description: description, periodType: periodType, periodInterval: periodInterval, periodDays: periodInterval))
+        let req = try request("/objects/chores/\(id)", method: "PUT", body: data)
+        try await performVoid(req)
+    }
+
+    func deleteChore(id: Int) async throws {
+        let req = try request("/objects/chores/\(id)", method: "DELETE")
+        try await performVoid(req)
+    }
+
+    func getChoreObject(id: Int) async throws -> Chore {
+        try await perform(try request("/objects/chores/\(id)"))
+    }
     
     // MARK: - Recipes
     
@@ -285,7 +367,13 @@ final class GrocyAPIClient {
     }
     
     func getRecipePositions(recipeId: Int) async throws -> [RecipePosition] {
-        try await perform(try request("/objects/recipes_pos?query[]=recipe_id%3D\(recipeId)"))
+        var comps = URLComponents(string: "\(baseURL)/api/objects/recipes_pos")!
+        comps.queryItems = [URLQueryItem(name: "query[]", value: "recipe_id=\(recipeId)")]
+        guard let url = comps.url else { throw NetworkError.invalidURL }
+        var req = URLRequest(url: url)
+        req.setValue(apiKey, forHTTPHeaderField: "GROCY-API-KEY")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        return try await perform(req)
     }
     
     func getRecipeFulfillment(recipeId: Int) async throws -> [RecipeFulfillment] {
@@ -304,6 +392,12 @@ final class GrocyAPIClient {
         let data = try encoder.encode(Body(servings: servings))
         let req = try request("/recipes/\(recipeId)/consume", method: "POST", body: data)
         try await performVoid(req)
+    }
+
+    func createRecipe(name: String, description: String?, baseServings: Double) async throws -> Int {
+        struct Body: Encodable { let name: String; let description: String?; let baseServings: Double }
+        let result: CreatedObjectResponse = try await post("/objects/recipes", body: Body(name: name, description: description, baseServings: baseServings))
+        return result.createdObjectId
     }
     
     // MARK: - Meal Plan
@@ -427,6 +521,18 @@ final class GrocyAPIClient {
     func linkBarcode(productId: Int, barcode: String) async throws {
         let body = NewBarcodeBody(productId: productId, barcode: barcode)
         try await postVoid("/objects/product_barcodes", body: body)
+    }
+
+    /// Returns all barcodes registered for a given product.
+    func getProductBarcodes(productId: Int) async throws -> [ProductBarcode] {
+        guard var comps = URLComponents(string: "\(baseURL)/api/objects/product_barcodes") else { return [] }
+        comps.queryItems = [URLQueryItem(name: "query[]", value: "product_id=\(productId)")]
+        guard let url = comps.url else { return [] }
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.setValue(apiKey, forHTTPHeaderField: "GROCY-API-KEY")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        return try await perform(req)
     }
 
     // MARK: - Files

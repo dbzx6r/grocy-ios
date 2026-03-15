@@ -8,13 +8,12 @@ struct ContentView: View {
     @State private var shoppingVM = ShoppingViewModel()
     @State private var tasksVM = TasksViewModel()
     @State private var recipesVM = RecipesViewModel()
-    @State private var selectedTab = 0
     @State private var showScanner = false
     @State private var pollingTask: Task<Void, Never>?
     @State private var lastDBTime: String?
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: Bindable(appVM).selectedTab) {
             Tab("Dashboard", systemImage: "house.fill", value: 0) {
                 DashboardView()
                     .environment(dashboardVM)

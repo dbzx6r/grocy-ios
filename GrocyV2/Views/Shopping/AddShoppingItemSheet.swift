@@ -12,6 +12,7 @@ struct AddShoppingItemSheet: View {
     @State private var didSucceed = false
     @State private var searchText = ""
     @State private var showScanner = false
+    @State private var addError: String? = nil
 
     private var filteredProducts: [Product] {
         searchText.isEmpty
@@ -95,6 +96,14 @@ struct AddShoppingItemSheet: View {
                     .disabled(isSubmitting || (selectedProduct == nil && note.isEmpty))
                 }
             }
+            .alert("Failed to Add Item", isPresented: .init(
+                get: { addError != nil },
+                set: { if !$0 { addError = nil } }
+            )) {
+                Button("OK", role: .cancel) { addError = nil }
+            } message: {
+                Text(addError ?? "")
+            }
             .sheet(isPresented: $showScanner) {
                 BarcodeScannerView(onProductPicked: { product in
                     selectedProduct = product
@@ -108,16 +117,21 @@ struct AddShoppingItemSheet: View {
     private func submit() async {
         guard let client = appVM.client else { return }
         isSubmitting = true
-        await vm.addItem(
-            client: client,
-            productId: selectedProduct?.id,
-            note: note.isEmpty ? nil : note,
-            amount: amount
-        )
-        HapticManager.shared.success()
-        withAnimation { didSucceed = true }
-        try? await Task.sleep(for: .seconds(0.6))
-        dismiss()
+        do {
+            try await vm.addItem(
+                client: client,
+                productId: selectedProduct?.id,
+                note: note.isEmpty ? nil : note,
+                amount: amount
+            )
+            HapticManager.shared.success()
+            withAnimation { didSucceed = true }
+            try? await Task.sleep(for: .seconds(0.6))
+            dismiss()
+        } catch {
+            addError = error.localizedDescription
+            HapticManager.shared.error()
+        }
         isSubmitting = false
     }
 }

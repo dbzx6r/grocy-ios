@@ -66,14 +66,15 @@ struct DashboardView: View {
                 ExpiringItemsCard(
                     expiringSoon: vm.expiringSoon,
                     overdue: vm.overdue,
-                    expired: vm.expired
+                    expired: vm.expired,
+                    onNavigate: { appVM.selectedTab = 1 }
                 )
                 .padding(.horizontal)
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
 
             if !vm.missing.isEmpty {
-                LowStockCard(missing: vm.missing)
+                LowStockCard(missing: vm.missing, onNavigate: { appVM.selectedTab = 2 })
                     .padding(.horizontal)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
@@ -81,7 +82,8 @@ struct DashboardView: View {
             if vm.overdueTasksCount > 0 || vm.overdueChoresCount > 0 {
                 OverdueCard(
                     tasks: vm.tasks.filter { $0.isOverdue },
-                    chores: vm.chores.filter { $0.isOverdue }
+                    chores: vm.chores.filter { $0.isOverdue },
+                    onNavigate: { appVM.selectedTab = 3 }
                 )
                 .padding(.horizontal)
                 .transition(.move(edge: .top).combined(with: .opacity))

@@ -45,15 +45,21 @@ final class ShoppingViewModel {
         error = nil
         do {
             async let listsResult = client.getShoppingLists()
-            async let itemsResult = client.getShoppingListItems(listId: selectedListId)
             async let productsResult = client.getProducts()
             async let groupsResult = client.getProductGroups()
             async let unitsResult = client.getQuantityUnits()
-            shoppingLists = try await listsResult
-            items = try await itemsResult
-            products = try await productsResult
-            productGroups = try await groupsResult
-            quantityUnits = try await unitsResult
+            let (fetchedLists, fetchedProducts, fetchedGroups, fetchedUnits) = try await (listsResult, productsResult, groupsResult, unitsResult)
+            shoppingLists = fetchedLists
+            products = fetchedProducts
+            productGroups = fetchedGroups
+            quantityUnits = fetchedUnits
+
+            // Correct selectedListId to a real list ID if the default (1) doesn't exist
+            if !shoppingLists.isEmpty && !shoppingLists.contains(where: { $0.id == selectedListId }) {
+                selectedListId = shoppingLists[0].id
+            }
+
+            items = try await client.getShoppingListItems(listId: selectedListId)
         } catch {
             self.error = error.localizedDescription
         }
@@ -87,13 +93,9 @@ final class ShoppingViewModel {
         }
     }
 
-    func addItem(client: GrocyAPIClient, productId: Int?, note: String?, amount: Double = 1) async {
-        do {
-            _ = try await client.addShoppingListItem(productId: productId, note: note, amount: amount, shoppingListId: selectedListId)
-            await load(client: client)
-        } catch {
-            self.error = error.localizedDescription
-        }
+    func addItem(client: GrocyAPIClient, productId: Int?, note: String?, amount: Double = 1) async throws {
+        try await client.addShoppingListItem(productId: productId, note: note, amount: amount, shoppingListId: selectedListId)
+        await load(client: client)
     }
 
     func autoFillMissing(client: GrocyAPIClient) async {
@@ -114,8 +116,59 @@ final class ShoppingViewModel {
         }
     }
 
+    /// Called from PutAwayView: purchase each item into stock, then clear done items from the list.
+    func putAway(client: GrocyAPIClient, entries: [PutAwayEntry]) async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for entry in entries {
+                group.addTask {
+                    _ = try await client.addStock(
+                        productId: entry.productId,
+                        amount: entry.amount,
+                        bestBeforeDate: entry.bestBeforeDateString,
+                        price: entry.priceDouble
+                    )
+                }
+            }
+            try await group.waitForAll()
+        }
+        try await client.clearShoppingList(listId: selectedListId, doneItemsOnly: true)
+        await load(client: client)
+    }
+
     func unitName(for quId: Int?) -> String {
         guard let id = quId else { return "" }
         return quantityUnits.first(where: { $0.id == id })?.name ?? ""
+    }
+
+    func createList(client: GrocyAPIClient, name: String) async {
+        do {
+            try await client.createShoppingList(name: name)
+            let updatedLists = try await client.getShoppingLists()
+            shoppingLists = updatedLists
+            // Switch to the newly created list
+            if let newList = updatedLists.last(where: { $0.name == name }) {
+                selectedListId = newList.id
+                items = (try? await client.getShoppingListItems(listId: selectedListId)) ?? []
+            }
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func deleteCurrentList(client: GrocyAPIClient) async {
+        let idToDelete = selectedListId
+        do {
+            try await client.deleteShoppingList(id: idToDelete)
+            shoppingLists.removeAll { $0.id == idToDelete }
+            if let first = shoppingLists.first {
+                selectedListId = first.id
+                items = (try? await client.getShoppingListItems(listId: selectedListId)) ?? []
+            } else {
+                selectedListId = 1
+                items = []
+            }
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 }

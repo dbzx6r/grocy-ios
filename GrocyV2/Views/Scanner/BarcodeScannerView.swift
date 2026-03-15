@@ -702,7 +702,8 @@ struct ImportProductCard: View {
         do {
             async let qusTask = client.getQuantityUnits()
             async let locsTask = client.getLocations()
-            let (qus, locs) = try await (qusTask, locsTask)
+            async let productsTask = client.getProducts()
+            let (qus, locs, existingProducts) = try await (qusTask, locsTask, productsTask)
 
             guard let defaultQu = qus.first else {
                 importError = "No quantity units found. Set up quantity units in Grocy first."
@@ -715,20 +716,28 @@ struct ImportProductCard: View {
                 return
             }
 
-            let descParts = [
-                offProduct.brands?.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces),
-                offProduct.quantity
-            ].compactMap { $0 }.filter { !$0.isEmpty }
-            let desc: String? = descParts.isEmpty ? nil : descParts.joined(separator: " — ")
+            // If a product with this name already exists, reuse it instead of creating a duplicate
+            let productId: Int
+            if let existing = existingProducts.first(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }) {
+                productId = existing.id
+            } else {
+                let descParts = [
+                    offProduct.brands?.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces),
+                    offProduct.quantity
+                ].compactMap { $0 }.filter { !$0.isEmpty }
+                let desc: String? = descParts.isEmpty ? nil : descParts.joined(separator: " — ")
 
-            let productId = try await client.createProduct(
-                name: name,
-                calories: offProduct.kcalPer100g,
-                description: desc,
-                defaultQuId: defaultQu.id,
-                defaultLocationId: defaultLoc.id
-            )
-            try await client.linkBarcode(productId: productId, barcode: barcode)
+                productId = try await client.createProduct(
+                    name: name,
+                    calories: offProduct.kcalPer100g,
+                    description: desc,
+                    defaultQuId: defaultQu.id,
+                    defaultLocationId: defaultLoc.id
+                )
+            }
+
+            // Link barcode (ignore duplicate-barcode errors gracefully)
+            try? await client.linkBarcode(productId: productId, barcode: barcode)
 
             let details = try await client.getProductDetails(id: productId)
             HapticManager.shared.success()

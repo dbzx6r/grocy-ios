@@ -5,7 +5,11 @@ struct ShoppingView: View {
     @Environment(AppViewModel.self) private var appVM
     @State private var showAddSheet = false
     @State private var showClearConfirm = false
+    @State private var showDeleteListConfirm = false
+    @State private var showNewListAlert = false
+    @State private var newListName = ""
     @State private var completionEffect = false
+    @State private var showPutAway = false
 
     var body: some View {
         NavigationStack {
@@ -13,12 +17,24 @@ struct ShoppingView: View {
                 if vm.isLoading && vm.items.isEmpty {
                     ShimmerList()
                 } else if vm.items.isEmpty {
-                    EmptyStateView(
-                        systemImage: "cart",
-                        title: "Shopping List Empty",
-                        subtitle: "Add items or tap Auto-fill to populate from low stock.",
-                        actionTitle: "Add Item"
-                    ) { showAddSheet = true }
+                    if let error = vm.error {
+                        EmptyStateView(
+                            systemImage: "exclamationmark.triangle",
+                            title: "Failed to Load",
+                            subtitle: error,
+                            actionTitle: "Retry"
+                        ) {
+                            guard let client = appVM.client else { return }
+                            Task { await vm.load(client: client) }
+                        }
+                    } else {
+                        EmptyStateView(
+                            systemImage: "cart",
+                            title: "Shopping List Empty",
+                            subtitle: "Add items or tap Auto-fill to populate from low stock.",
+                            actionTitle: "Add Item"
+                        ) { showAddSheet = true }
+                    }
                 } else {
                     shoppingList
                 }
@@ -34,6 +50,11 @@ struct ShoppingView: View {
         }
         .sheet(isPresented: $showAddSheet) {
             AddShoppingItemSheet()
+                .environment(vm)
+                .environment(appVM)
+        }
+        .sheet(isPresented: $showPutAway) {
+            PutAwayView()
                 .environment(vm)
                 .environment(appVM)
         }
@@ -60,30 +81,45 @@ struct ShoppingView: View {
             }
             Button("Cancel", role: .cancel) {}
         }
+        .confirmationDialog(
+            "Delete \"\(vm.shoppingLists.first(where: { $0.id == vm.selectedListId })?.name ?? "this list")\"?",
+            isPresented: $showDeleteListConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete List", role: .destructive) {
+                guard let client = appVM.client else { return }
+                Task { await vm.deleteCurrentList(client: client) }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+        .alert("New Shopping List", isPresented: $showNewListAlert) {
+            TextField("List name", text: $newListName)
+            Button("Create") {
+                let name = newListName.trimmingCharacters(in: .whitespaces)
+                guard !name.isEmpty else { return }
+                guard let client = appVM.client else { return }
+                Task { await vm.createList(client: client, name: name) }
+                newListName = ""
+            }
+            Button("Cancel", role: .cancel) { newListName = "" }
+        }
         .task {
             guard let client = appVM.client else { return }
             if vm.items.isEmpty { await vm.load(client: client) }
+        }
+        .onChange(of: vm.selectedListId) { _, _ in
+            guard let client = appVM.client else { return }
+            Task { await vm.load(client: client) }
         }
     }
 
     @ViewBuilder
     private var shoppingList: some View {
         List {
-            if vm.shoppingLists.count > 1 {
-                Section {
-                    Picker("List", selection: Bindable(vm).selectedListId) {
-                        ForEach(vm.shoppingLists) { list in
-                            Text(list.name).tag(list.id)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-            }
-
             ForEach(vm.groupedPending, id: \.group) { group in
                 Section(group.group) {
                     ForEach(group.items) { item in
-                        ShoppingItemRow(item: item) {
+                        ShoppingItemRow(item: item, products: vm.products) {
                             guard let client = appVM.client else { return }
                             Task {
                                 await vm.toggleDone(client: client, item: item)
@@ -112,7 +148,7 @@ struct ShoppingView: View {
                 Section {
                     DisclosureGroup("\(vm.doneItems.count) completed item\(vm.doneItems.count == 1 ? "" : "s")") {
                         ForEach(vm.doneItems) { item in
-                            ShoppingItemRow(item: item) {
+                            ShoppingItemRow(item: item, products: vm.products) {
                                 guard let client = appVM.client else { return }
                                 Task { await vm.toggleDone(client: client, item: item) }
                             }
@@ -146,6 +182,25 @@ struct ShoppingView: View {
                     Label("Auto-fill Missing", systemImage: "wand.and.stars")
                 }
 
+                Divider()
+
+                Button {
+                    newListName = ""
+                    showNewListAlert = true
+                } label: {
+                    Label("New List", systemImage: "plus.rectangle.on.rectangle")
+                }
+
+                if vm.shoppingLists.count > 1 {
+                    Button(role: .destructive) {
+                        showDeleteListConfirm = true
+                    } label: {
+                        Label("Delete Current List", systemImage: "trash")
+                    }
+                }
+
+                Divider()
+
                 Button(role: .destructive) {
                     showClearConfirm = true
                 } label: {
@@ -156,7 +211,31 @@ struct ShoppingView: View {
             }
 
             Button { showAddSheet = true } label: {
-                Image(systemName: "plus")
+                    Image(systemName: "plus")
+                }
+
+            if !vm.doneItems.isEmpty {
+                Button {
+                    showPutAway = true
+                } label: {
+                    Label("Put Away", systemImage: "tray.and.arrow.down.fill")
+                        .labelStyle(.titleAndIcon)
+                        .font(.subheadline.weight(.semibold))
+                }
+                .tint(.accentColor)
+                .transition(.scale.combined(with: .opacity))
+            }
+        }
+
+        ToolbarItem(placement: .principal) {
+            if vm.shoppingLists.count > 1 {
+                Picker("List", selection: Bindable(vm).selectedListId) {
+                    ForEach(vm.shoppingLists) { list in
+                        Text(list.name).tag(list.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .fontWeight(.semibold)
             }
         }
     }

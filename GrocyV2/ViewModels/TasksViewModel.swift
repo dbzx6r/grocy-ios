@@ -12,6 +12,12 @@ final class TasksViewModel {
     var selectedTab: TaskTab = .tasks
     var showCompleted = false
 
+    // Sheet state
+    var showAddEditTask = false
+    var showAddEditChore = false
+    var editingTask: GrocyTask? = nil
+    var editingChoreId: Int? = nil
+
     enum TaskTab: String, CaseIterable {
         case tasks = "Tasks"
         case chores = "Chores"
@@ -89,6 +95,62 @@ final class TasksViewModel {
             await load(client: client)
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+
+    func createTask(client: GrocyAPIClient, name: String, description: String?, dueDate: String?, categoryId: Int?) async {
+        do {
+            try await client.createTask(name: name, description: description, dueDate: dueDate, categoryId: categoryId)
+            await load(client: client)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func updateTask(client: GrocyAPIClient, id: Int, name: String, description: String?, dueDate: String?, categoryId: Int?) async {
+        do {
+            try await client.updateTask(id: id, name: name, description: description, dueDate: dueDate, categoryId: categoryId)
+            await load(client: client)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func deleteTask(client: GrocyAPIClient, id: Int) async {
+        tasks.removeAll { $0.id == id }
+        do {
+            try await client.deleteTask(id: id)
+        } catch {
+            self.error = error.localizedDescription
+            await load(client: client)
+        }
+    }
+
+    func createChore(client: GrocyAPIClient, name: String, description: String?, periodType: String, periodInterval: Int) async {
+        do {
+            try await client.createChore(name: name, description: description, periodType: periodType, periodInterval: periodInterval)
+            await load(client: client)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func updateChore(client: GrocyAPIClient, id: Int, name: String, description: String?, periodType: String, periodInterval: Int) async {
+        do {
+            try await client.updateChore(id: id, name: name, description: description, periodType: periodType, periodInterval: periodInterval)
+            await load(client: client)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func deleteChore(client: GrocyAPIClient, id: Int) async {
+        chores.removeAll { $0.id == id }
+        do {
+            try await client.deleteChore(id: id)
+        } catch {
+            self.error = error.localizedDescription
+            await load(client: client)
         }
     }
 }

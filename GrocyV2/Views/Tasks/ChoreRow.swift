@@ -16,17 +16,17 @@ struct ChoreRow: View {
             }
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(detail.chore.name)
+                Text(detail.name)
                     .font(.subheadline.weight(.medium))
 
-                if let desc = detail.chore.description, !desc.isEmpty {
+                if let desc = detail.description, !desc.isEmpty {
                     Text(desc)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
 
-                if let last = detail.lastTracked {
+                if let last = detail.lastTrackedTime {
                     Text("Last done: \(last)")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
